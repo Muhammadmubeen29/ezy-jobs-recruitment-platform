@@ -23,6 +23,24 @@ const convertToArray = (value) => {
   return [];
 };
 
+// Simple slug generator
+const slugify = (text) =>
+  String(text)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+// Ensure slug uniqueness by appending timestamp if duplicate
+const generateUniqueSlug = async (base, JobModel) => {
+  let slug = slugify(base || 'job');
+  // Check for existing slug
+  const exists = await JobModel.findOne({ 'seo.slug': slug }).lean();
+  if (!exists) return slug;
+  // Append timestamp to guarantee uniqueness
+  return `${slug}-${Date.now()}`;
+};
+
 /**
  * @desc Creates a new job.
  *
@@ -119,7 +137,57 @@ const createJob = asyncHandler(async (req, res) => {
     isClosed: false,
   };
 
-  const job = await Job.create(validatedData);
+  // Generate SEO slug to avoid duplicate-null unique index errors
+  try {
+    const slug = await generateUniqueSlug(validatedData.title, Job);
+    validatedData.seo = { slug };
+  } catch (err) {
+    // Fallback: attach timestamp-based slug
+    validatedData.seo = { slug: `${slugify(validatedData.title)}-${Date.now()}` };
+  }
+
+  let job;
+  try {
+    job = await Job.create(validatedData);
+  } catch (err) {
+    // Handle duplicate key errors (e.g., seo.slug unique index)
+    if (err && (err.code === 11000 || err.name === 'MongoServerError')) {
+      // If duplicate key is caused by seo.slug:null (multiple nulls in unique index), try to backfill a unique slug and retry
+      const dupKey = err.keyValue ? Object.keys(err.keyValue)[0] : null;
+      const errMsg = err.message || '';
+
+      const isSeoNullDup = dupKey === 'seo.slug' || /seo\.slug/.test(errMsg);
+
+      if (isSeoNullDup) {
+        // Create a safe unique slug and retry once
+        validatedData.seo = {
+          slug: `${slugify(validatedData.title)}-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        };
+
+        try {
+          job = await Job.create(validatedData);
+        } catch (retryErr) {
+          // If retry still fails with duplicate key, return friendly conflict
+          if (retryErr && (retryErr.code === 11000 || retryErr.name === 'MongoServerError')) {
+            res.status(StatusCodes.CONFLICT);
+            const key = retryErr.keyValue ? Object.keys(retryErr.keyValue).join(', ') : 'unique field';
+            throw new Error(
+              `A record with the same ${key} already exists. Please modify the title or other unique fields and try again.`
+            );
+          }
+          throw retryErr;
+        }
+      }
+
+      res.status(StatusCodes.CONFLICT);
+      const key = err.keyValue ? Object.keys(err.keyValue).join(', ') : 'unique field';
+      throw new Error(
+        `A record with the same ${key} already exists. Please modify the title or other unique fields and try again.`
+      );
+    }
+    // Re-throw other errors to be handled by global error handler
+    throw err;
+  }
 
   if (!job) {
     res.status(StatusCodes.BAD_REQUEST);
@@ -262,10 +330,15 @@ const getAllJobs = asyncHandler(async (req, res) => {
     .limit(limit ? parseInt(limit) : 0);
 
   if (!jobs || jobs.length === 0) {
-    res.status(StatusCodes.NOT_FOUND);
-    throw new Error(
-      'No jobs match your search criteria. Try adjusting your filters.'
-    );
+    // Return an empty list instead of throwing an error so clients can
+    // handle zero-results without receiving a server error status.
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'No jobs match your search criteria. Try adjusting your filters.',
+      count: 0,
+      jobs: [],
+      timestamp: new Date().toISOString(),
+    });
   }
 
   const jobsData = jobs.map((job) => {
@@ -421,7 +494,29 @@ const updateJobById = asyncHandler(async (req, res) => {
     validatedData.benefits = validatedBenefits;
   }
 
-  const updatedJob = await Job.findByIdAndUpdate(jobId, validatedData, { new: true }).populate('recruiterId', 'firstName lastName email');
+  // If title changed, regenerate SEO slug
+  if (title) {
+    try {
+      const slug = await generateUniqueSlug(validatedData.title || title, Job);
+      validatedData.seo = { slug };
+    } catch (err) {
+      validatedData.seo = { slug: `${slugify(validatedData.title || title)}-${Date.now()}` };
+    }
+  }
+
+  let updatedJob;
+  try {
+    updatedJob = await Job.findByIdAndUpdate(jobId, validatedData, { new: true }).populate('recruiterId', 'firstName lastName email');
+  } catch (err) {
+    if (err && (err.code === 11000 || err.name === 'MongoServerError')) {
+      res.status(StatusCodes.CONFLICT);
+      const key = err.keyValue ? Object.keys(err.keyValue).join(', ') : 'unique field';
+      throw new Error(
+        `Unable to update job because a record with the same ${key} already exists. Please change the conflicting field and try again.`
+      );
+    }
+    throw err;
+  }
 
   if (!updatedJob) {
     res.status(StatusCodes.BAD_REQUEST);
@@ -429,21 +524,29 @@ const updateJobById = asyncHandler(async (req, res) => {
   }
 
   if (!job.isClosed && updatedJob.isClosed === true && req.user.isRecruiter) {
+    // Trigger internal shortlisting using the internal API key when available
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    // Prefer internal token for server-to-server auth
+    if (process.env.INTERNAL_API_KEY) {
+      headers['x-internal-token'] = process.env.INTERNAL_API_KEY;
+    } else if (req.headers.authorization && req.headers.authorization.split(' ')[1]) {
+      headers['Authorization'] = `Bearer ${req.headers.authorization.split(' ')[1]}`;
+    }
+
     axios
       .post(
         `${process.env.SERVER_URL || 'http://localhost:5000'}/api/v1/ai/shortlist/${jobId}`,
         {},
         {
-          headers: {
-            Authorization: `Bearer ${req.headers.authorization.split(' ')[1]}`,
-          },
+          headers,
+          timeout: 60000,
         }
       )
       .catch((error) => {
-        console.error(
-          'Failed to trigger automatic candidate shortlisting:',
-          error.message
-        );
+        console.error('Failed to trigger automatic candidate shortlisting:', error && (error.message || error));
       });
   }
 

@@ -27,18 +27,53 @@ const jobSchema = new mongoose.Schema({
     match: [/^[a-zA-Z0-9\s\-&(),.]+$/, 'Company name can only contain letters, numbers, spaces, and basic punctuation'],
   },
   requirements: {
-    type: String,
+    type: [String],
     required: [true, 'Job requirements are required'],
-    trim: true,
-    minlength: [50, 'Job requirements must be at least 50 characters'],
-    maxlength: [2000, 'Job requirements must not exceed 2000 characters'],
+    set: function(v) {
+      // Accept array or newline/comma separated string and coerce to array
+      if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+      if (typeof v === 'string') {
+        return v
+          .split(/\r?\n|,/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      return v;
+    },
+    validate: {
+      validator: function(value) {
+        if (!Array.isArray(value)) return false;
+        if (value.length < 1) return false;
+        if (value.length > 20) return false;
+        const joined = value.join('\n');
+        return joined.length >= 50 && joined.length <= 2000;
+      },
+      message: 'Job requirements must be an array of 1-20 items and total length between 50 and 2000 characters',
+    },
   },
   benefits: {
-    type: String,
+    type: [String],
     required: [true, 'Job benefits are required'],
-    trim: true,
-    minlength: [50, 'Job benefits must be at least 50 characters'],
-    maxlength: [2000, 'Job benefits must not exceed 2000 characters'],
+    set: function(v) {
+      if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+      if (typeof v === 'string') {
+        return v
+          .split(/\r?\n|,/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      return v;
+    },
+    validate: {
+      validator: function(value) {
+        if (!Array.isArray(value)) return false;
+        if (value.length < 1) return false;
+        if (value.length > 20) return false;
+        const joined = value.join('\n');
+        return joined.length >= 50 && joined.length <= 2000;
+      },
+      message: 'Job benefits must be an array of 1-20 items and total length between 50 and 2000 characters',
+    },
   },
   salaryRange: {
     type: String,

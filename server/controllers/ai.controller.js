@@ -10,7 +10,8 @@ const {
   generateEmailTemplate,
 } = require('../utils/nodemailer.utils');
 
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:5001';
+// AI server URL — prefer explicit env var, fallback to local ML service default (port 10000)
+const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:10000';
 
 /**
  * @desc Check AI server system health
@@ -156,8 +157,6 @@ const getModelMetrics = asyncHandler(async (req, res) => {
  * @access Private (Admin)
  *
  * @param {Object} req - The request object containing training parameters.
- * @param {Object} res - The response object.
- *
  * @returns {Promise<void>}
  */
 const trainModel = asyncHandler(async (req, res) => {
@@ -316,8 +315,45 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
     });
 
   if (!applications || applications.length === 0) {
-    res.status(StatusCodes.NOT_FOUND);
-    throw new Error('No applications with resumes found for this job posting.');
+    // No applications — return a successful no-op response so callers
+    // get a predictable 200 instead of a server error.
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'No applications found for this job posting. No action taken.',
+      data: { totalApplications: 0, shortlistedCount: 0, rejectedCount: 0 },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Filter to only applications where the populated candidate has an associated resume
+  const applicationsWithResumes = applications.filter(
+    (app) => app.candidateId && app.candidateId.resume
+  );
+
+  if (applicationsWithResumes.length === 0) {
+    // No applications with resumes — return a successful no-op response.
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'No applications with resumes found for this job posting. No action taken.',
+      data: { totalApplications: applications.length, applicationsWithResumes: 0 },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Diagnostic logging: report counts and presence of resume on each application
+  try {
+    console.info('AI shortlisting - fetched applications:', {
+      totalApplicationsFetched: applications.length,
+      applicationsWithResumes: applicationsWithResumes.length,
+      appSummary: applicationsWithResumes.map((a) => ({
+        id: a._id?.toString?.(),
+        status: a.status,
+        candidatePresent: !!a.candidateId,
+        resumePresent: !!a.candidateId?.resume,
+      })),
+    });
+  } catch (logErr) {
+    console.warn('Failed to log application diagnostics', logErr);
   }
 
   try {
@@ -332,7 +368,7 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
         company: job.company,
         salaryRange: job.salaryRange,
       },
-      applications: applications.map((app) => ({
+      applications: applicationsWithResumes.map((app) => ({
         id: app.id,
         candidateId: app.candidateId,
         status: app.status,
@@ -344,16 +380,16 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
           phone: app.candidateId.phone,
         },
         resume: {
-          userId: app.candidateId.resume?.userId,
-          title: app.candidateId.resume?.title,
-          summary: app.candidateId.resume?.summary,
-          headline: app.candidateId.resume?.headline,
-          skills: app.candidateId.resume?.skills || [],
-          experience: app.candidateId.resume?.experience,
-          education: app.candidateId.resume?.education,
-          industry: app.candidateId.resume?.industry,
-          company: app.candidateId.resume?.company,
-          achievements: app.candidateId.resume?.achievements,
+          userId: app.candidateId.resume.userId,
+          title: app.candidateId.resume.title,
+          summary: app.candidateId.resume.summary,
+          headline: app.candidateId.resume.headline,
+          skills: app.candidateId.resume.skills || [],
+          experience: app.candidateId.resume.experience,
+          education: app.candidateId.resume.education,
+          industry: app.candidateId.resume.industry,
+          company: app.candidateId.resume.company,
+          achievements: app.candidateId.resume.achievements,
         },
       })),
     };
@@ -371,61 +407,57 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
 
     let shortlistedCandidates = response.data.shortlisted_candidates || [];
 
-    // Get IDs of all applications for this job to identify the rejected ones
-    const allAppIds = applications.map((app) => app.id);
+    // Get IDs of all applications (that have resumes) for this job to identify the rejected ones
+    const allAppIds = applicationsWithResumes.map((app) => app.id);
 
     // Get IDs of shortlisted applications
     const shortlistedAppIds = shortlistedCandidates.map(
       (candidate) => candidate.application_id
     );
 
-    // Find rejected application IDs (all applications minus shortlisted ones)
-    const rejectedAppIds = allAppIds.filter(
-      (id) => !shortlistedAppIds.includes(id)
-    );
-
-    // Update shortlisted applications status
-    if (shortlistedAppIds.length > 0) {
-      await Application.update(
-        { status: 'shortlisted' },
-        {
-          where: {
-            id: {
-              [Op.in]: shortlistedAppIds,
-            },
-          },
-        }
+    // If the AI returned no shortlisted candidates, do NOT mass-reject.
+    // This avoids accidental mass rejections when the AI returns an empty list.
+    if (shortlistedAppIds.length === 0) {
+      console.warn(
+        'AI returned zero shortlisted candidates — skipping automatic rejection to avoid mass-reject.'
       );
-    }
-
-    // Update rejected applications status
-    if (rejectedAppIds.length > 0) {
-      await Application.update(
-        { status: 'rejected' },
-        {
-          where: {
-            id: {
-              [Op.in]: rejectedAppIds,
-            },
-          },
-        }
+    } else {
+      // Find rejected application IDs (all applications minus shortlisted ones)
+      const rejectedAppIds = allAppIds.filter(
+        (id) => !shortlistedAppIds.includes(id)
       );
+
+      // Update shortlisted applications status (Mongoose)
+      if (shortlistedAppIds.length > 0) {
+        await Application.updateMany(
+          { _id: { $in: shortlistedAppIds } },
+          { $set: { status: 'shortlisted' } }
+        );
+      }
+
+      // Update rejected applications status (Mongoose)
+      if (rejectedAppIds.length > 0) {
+        await Application.updateMany(
+          { _id: { $in: rejectedAppIds } },
+          { $set: { status: 'rejected' } }
+        );
+      }
     }
 
     // Send notification emails to shortlisted candidates
     const shortlistedEmailPromises = shortlistedCandidates.map(
       async (candidate) => {
-        const application = applications.find(
+        const application = applicationsWithResumes.find(
           (app) => app.id === candidate.application_id
         );
 
         if (application) {
           return sendEmail(res, {
             from: process.env.NODEMAILER_SMTP_EMAIL,
-            to: application.candidate.email,
+            to: application.candidateId.email,
             subject: 'EZY Jobs - Application Shortlisted',
             html: generateEmailTemplate({
-              firstName: application.candidate.firstName,
+              firstName: application.candidateId.firstName,
               subject: 'Congratulations! You have been shortlisted',
               content: [
                 {
@@ -470,15 +502,15 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
 
     // Send rejection emails to rejected candidates
     const rejectedEmailPromises = rejectedAppIds.map(async (appId) => {
-      const application = applications.find((app) => app.id === appId);
+      const application = applicationsWithResumes.find((app) => app.id === appId);
 
       if (application) {
         return sendEmail(res, {
           from: process.env.NODEMAILER_SMTP_EMAIL,
-          to: application.candidate.email,
+          to: application.candidateId.email,
           subject: 'EZY Jobs - Application Update',
           html: generateEmailTemplate({
-            firstName: application.candidate.firstName,
+            firstName: application.candidateId.firstName,
             subject: 'Update on your job application',
             content: [
               {
@@ -543,9 +575,32 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    // Log full error details for debugging (do not send these to clients)
+    try {
+      console.error('AI shortlisting error:', {
+        message: error.message,
+        stack: error.stack,
+        responseStatus: error.response?.status,
+        responseData: error.response?.data,
+      });
+    } catch (logErr) {
+      console.error('Failed to log AI error details', logErr);
+    }
+
     if (error.response?.status === StatusCodes.BAD_REQUEST) {
       res.status(StatusCodes.BAD_REQUEST);
       throw new Error('Invalid job or application data for AI processing.');
+    }
+
+    // Map known AI model error codes (returned in response data) to a clearer client status
+    const aiErrorCode = error.response?.data?.error_code;
+    if (
+      aiErrorCode === 'MODEL_NOT_TRAINED' ||
+      aiErrorCode === 'MODEL_COMPONENTS_MISSING' ||
+      aiErrorCode === 'TRAINING_FAILED'
+    ) {
+      res.status(StatusCodes.SERVICE_UNAVAILABLE);
+      throw new Error('AI model is not trained or available. Please train the model first.');
     }
 
     if (error.response?.status === StatusCodes.SERVICE_UNAVAILABLE) {
@@ -560,6 +615,7 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
       throw new Error('AI shortlisting request timed out. Please try again.');
     }
 
+    // If the AI service returned a JSON error body with a message, surface a generic message but include that in server logs.
     res.status(StatusCodes.INTERNAL_SERVER_ERROR);
     throw new Error(
       'AI-powered candidate shortlisting failed. Please try again later.'

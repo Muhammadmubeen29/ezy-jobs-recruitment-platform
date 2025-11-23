@@ -100,7 +100,7 @@ def generate_training_data(num_examples=200):
 
         print(f"{Fore.CYAN}💾 Saving training data...{Style.RESET_ALL}")
         filepath = generator.save_training_data(
-            training_data, "optahire_training_data.json"
+            training_data, "ezyjobs_training_data.json"
         )
 
         print_success(
@@ -114,7 +114,7 @@ def generate_training_data(num_examples=200):
         return None, None
 
 
-def load_training_data(filepath="data/optahire_training_data.json"):
+def load_training_data(filepath="data/ezyjobs_training_data.json"):
     """Load training data from file"""
     try:
         if not os.path.exists(filepath):
@@ -436,7 +436,7 @@ def main():
     args = parser.parse_args()
 
     print_header(
-        "🤖 OPTAHIRE AI MODEL TRAINING PIPELINE",
+        "🤖 ezyjobs AI MODEL TRAINING PIPELINE",
         f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
     )
     print_system_info()

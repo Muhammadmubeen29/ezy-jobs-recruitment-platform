@@ -136,8 +136,18 @@ const refreshToken = asyncHandler(async (req, res) => {
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {
-      res.status(StatusCodes.NOT_FOUND);
-      throw new Error('Account not found. Please contact support.');
+      // Clear any stale refresh token cookie and return a clear auth error
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      });
+
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        success: false,
+        message: 'Session is invalid. Please sign in again.',
+        timestamp: new Date().toISOString(),
+      });
     }
 
     const accessToken = user.generateAccessToken();
@@ -150,15 +160,40 @@ const refreshToken = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Refresh token verification error:', error.message);
-    res.status(StatusCodes.UNAUTHORIZED);
-    
-    if (error.name === 'TokenExpiredError') {
-      throw new Error('Session expired. Please sign in again.');
-    } else if (error.name === 'JsonWebTokenError') {
-      throw new Error('Invalid session. Please sign in again.');
-    } else {
-      throw new Error('Authentication failed. Please sign in again.');
+
+    // Clear any stale refresh token cookie
+    try {
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      });
+    } catch (cookieErr) {
+      console.warn('Failed to clear refreshToken cookie:', cookieErr?.message);
     }
+
+    // Map known JWT errors to a friendly JSON response so clients don't get 500s
+    if (error.name === 'TokenExpiredError') {
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        success: false,
+        message: 'Session expired. Please sign in again.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        success: false,
+        message: 'Invalid session. Please sign in again.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.status(StatusCodes.UNAUTHORIZED).json({
+      success: false,
+      message: 'Authentication failed. Please sign in again.',
+      timestamp: new Date().toISOString(),
+    });
   }
 });
 

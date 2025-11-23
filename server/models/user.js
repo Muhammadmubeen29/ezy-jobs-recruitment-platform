@@ -114,6 +114,14 @@ userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
+// Virtual to link user's resume (one-to-one)
+userSchema.virtual('resume', {
+  ref: 'Resume',
+  localField: '_id',
+  foreignField: 'userId',
+  justOne: true,
+});
+
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
   // Only hash the password if it has been modified (or is new)

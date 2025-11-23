@@ -61,8 +61,18 @@ const notFoundHandler = (req, res) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-  const message =
-    err.message || 'Something went wrong. Please try again later.';
+  // Map certain Mongo errors to HTTP status codes and friendly messages
+  let statusCode = err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
+  let message = err.message || 'Something went wrong. Please try again later.';
+
+  // Duplicate key (E11000) -> Conflict
+  if (err && (err.code === 11000 || err.name === 'MongoServerError')) {
+    statusCode = StatusCodes.CONFLICT;
+    const key = err.keyValue ? Object.keys(err.keyValue).join(', ') : 'unique field';
+    message = message === 'Something went wrong. Please try again later.'
+      ? `A record with the same ${key} already exists.`
+      : message;
+  }
 
   console.error('\n' + '='.repeat(86).red);
   console.error(`❌ SERVER ERROR`.bold.red);
@@ -90,7 +100,7 @@ const errorHandler = (err, req, res, next) => {
 
   console.error('='.repeat(86).red);
 
-  res.json({
+  res.status(statusCode).json({
     success: false,
     message,
     timestamp: new Date().toISOString(),

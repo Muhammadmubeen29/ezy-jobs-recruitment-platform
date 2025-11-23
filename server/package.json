@@ -11,7 +11,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "seed": "node seeders/mongodb-seeder.js"
+    "seed": "node seeders/mongodb-seeder.js",
+    "backfill:seo": "node scripts/backfill_seo_slug.js"
   },
   "keywords": ["jobs", "recruitment", "hiring", "ezy-jobs"],
   "author": "Mubeen Mukhtar",

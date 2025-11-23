@@ -226,8 +226,19 @@ const getAllInterviews = asyncHandler(async (req, res) => {
     .populate('jobId', 'title company')
     .populate('applicationId')
     .sort({ scheduledTime: -1 });
+  // Normalize returned interview objects to match client expectations
+  const normalized = (interviews || []).map((iv) => {
+    const obj = iv.toObject ? iv.toObject() : iv;
+    return {
+      ...obj,
+      job: obj.jobId || { title: 'Not set', description: '' },
+      candidate: obj.candidateId || { firstName: '', lastName: '', email: '' },
+      interviewer: obj.interviewerId || { firstName: '', lastName: '', email: '' },
+      application: obj.applicationId || null,
+    };
+  });
 
-  if (!interviews || interviews.length === 0) {
+  if (!normalized || normalized.length === 0) {
     return res.status(StatusCodes.OK).json({
       success: true,
       message: 'No interviews found matching the criteria.',
@@ -240,8 +251,8 @@ const getAllInterviews = asyncHandler(async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: 'Interviews retrieved successfully.',
-    count: interviews.length,
-    interviews,
+    count: normalized.length,
+    interviews: normalized,
     timestamp: new Date().toISOString(),
   });
 });
@@ -267,7 +278,18 @@ const getInterviewsByJobId = asyncHandler(async (req, res) => {
     .populate('jobId', 'title company')
     .populate('applicationId')
     .sort({ scheduledTime: -1 });
-  if (!interviews || interviews.length === 0) {
+  const normalized = (interviews || []).map((iv) => {
+    const obj = iv.toObject ? iv.toObject() : iv;
+    return {
+      ...obj,
+      job: obj.jobId || { title: 'Not set', description: '' },
+      candidate: obj.candidateId || { firstName: '', lastName: '', email: '' },
+      interviewer: obj.interviewerId || { firstName: '', lastName: '', email: '' },
+      application: obj.applicationId || null,
+    };
+  });
+
+  if (!normalized || normalized.length === 0) {
     return res.status(StatusCodes.OK).json({
       success: true,
       message: 'No interviews found for this job.',
@@ -280,8 +302,8 @@ const getInterviewsByJobId = asyncHandler(async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: 'Interviews retrieved successfully.',
-    count: interviews.length,
-    interviews,
+    count: normalized.length,
+    interviews: normalized,
     timestamp: new Date().toISOString(),
   });
 });
@@ -310,10 +332,18 @@ const getInterviewById = asyncHandler(async (req, res) => {
     throw new Error('Interview not found.');
   }
 
+  const obj = interview.toObject ? interview.toObject() : interview;
+
   res.status(StatusCodes.OK).json({
     success: true,
     message: 'Interview details retrieved successfully.',
-    interview,
+    interview: {
+      ...obj,
+      job: obj.jobId || null,
+      candidate: obj.candidateId || null,
+      interviewer: obj.interviewerId || null,
+      application: obj.applicationId || null,
+    },
     timestamp: new Date().toISOString(),
   });
 });
