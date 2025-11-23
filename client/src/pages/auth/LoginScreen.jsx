@@ -23,6 +23,7 @@ import { setUserInfo, updateAccessToken } from '../../features/auth/authSlice';
 function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
 
   const navigate = useNavigate();
@@ -63,6 +64,14 @@ function LoginScreen() {
 
       dispatch(setUserInfo(result.user));
       dispatch(updateAccessToken(result.accessToken));
+
+      // Optionally persist a short-lived preference locally (remember me)
+      try {
+        if (rememberMe) localStorage.setItem('rememberEmail', email);
+        else localStorage.removeItem('rememberEmail');
+      } catch (e) {
+        // ignore storage errors
+      }
 
       const expectedRoute = getExpectedRoute(result.user);
 
@@ -144,6 +153,24 @@ function LoginScreen() {
                 onChange={(e) => handleChange('password', e.target.value)}
                 validationMessage={errors.password}
               />
+                <div className="flex items-center justify-between">
+                  <label className="inline-flex items-center gap-2 text-sm text-light-text dark:text-dark-text">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-light-border dark:border-dark-border"
+                    />
+                    Remember me
+                  </label>
+
+                  <Link
+                    to="/auth/reset-password"
+                    className="text-light-primary transition-all duration-200 hover:text-light-secondary dark:text-dark-primary dark:hover:text-dark-secondary text-sm"
+                  >
+                    Forgot?
+                  </Link>
+                </div>
               <div className="flex items-center justify-end">
                 <Link
                   to="/auth/reset-password"
@@ -155,9 +182,35 @@ function LoginScreen() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="active:scale-98 w-full rounded-lg bg-light-primary py-3 text-lg font-semibold text-white shadow-lg transition-all duration-300 hover:bg-light-secondary hover:shadow-xl dark:bg-dark-primary dark:hover:bg-dark-secondary"
+                className="active:scale-98 w-full rounded-lg bg-light-primary py-3 text-lg font-semibold text-white shadow-lg transition-all duration-300 hover:bg-light-secondary hover:shadow-xl dark:bg-dark-primary dark:hover:bg-dark-secondary flex items-center justify-center gap-2"
               >
-                Login
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      ></path>
+                    </svg>
+                    Signing in...
+                  </span>
+                ) : (
+                  'Login'
+                )}
               </button>
             </form>
 

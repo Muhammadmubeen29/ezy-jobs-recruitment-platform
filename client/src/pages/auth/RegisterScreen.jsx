@@ -44,6 +44,7 @@ function RegisterScreen() {
     confirmPassword: '',
     role: '',
   });
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: 'Too short', color: 'red' });
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -77,6 +78,7 @@ function RegisterScreen() {
           password: validatePassword(value),
           confirmPassword: validateConfirmPassword(confirmPassword, value),
         }));
+        setPasswordStrength(evaluatePasswordStrength(value));
         break;
       case 'confirmPassword':
         setConfirmPassword(value);
@@ -88,6 +90,25 @@ function RegisterScreen() {
       default:
         break;
     }
+  };
+
+  const evaluatePasswordStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: 'Too short', color: 'red' };
+    let score = 0;
+    if (pwd.length >= 8) score += 1;
+    if (/[A-Z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+    const map = {
+      0: { label: 'Too short', color: 'red' },
+      1: { label: 'Weak', color: 'orange' },
+      2: { label: 'Fair', color: 'yellow' },
+      3: { label: 'Good', color: 'green' },
+      4: { label: 'Strong', color: 'teal' },
+    };
+
+    return { score, ...map[score] };
   };
 
   const handleSubmit = async (e) => {
@@ -259,6 +280,28 @@ function RegisterScreen() {
                 onChange={(e) => handleChange('password', e.target.value)}
                 validationMessage={errors.password}
               />
+              <div className="mb-4">
+                <div className="h-2 w-full rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                  <div
+                    style={{
+                      width: `${(passwordStrength.score / 4) * 100}%`,
+                      backgroundColor:
+                        passwordStrength.color === 'red'
+                          ? '#f43f5e'
+                          : passwordStrength.color === 'orange'
+                          ? '#fb923c'
+                          : passwordStrength.color === 'yellow'
+                          ? '#f59e0b'
+                          : passwordStrength.color === 'green'
+                          ? '#10b981'
+                          : '#14b8a6',
+                    }}
+                    className="h-full transition-all duration-300"
+                    aria-hidden
+                  />
+                </div>
+                <p className="mt-2 text-sm text-light-text dark:text-dark-text">Strength: <strong style={{ color: passwordStrength.color === 'red' ? '#f43f5e' : passwordStrength.color === 'orange' ? '#fb923c' : passwordStrength.color === 'yellow' ? '#f59e0b' : passwordStrength.color === 'green' ? '#10b981' : '#0d9488' }}>{passwordStrength.label}</strong></p>
+              </div>
               <InputField
                 id="confirmPassword"
                 type="password"
