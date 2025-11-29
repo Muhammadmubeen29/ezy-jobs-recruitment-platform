@@ -277,7 +277,7 @@ const generateEmailTemplate = ({ firstName, subject, content = [] }) => {
     <body>
       <div class="container" role="main">
         <header class="header-container">
-          <img src="https://opta-hire-develop-server.vercel.app/assets/logo.png" alt="EZY Jobs Logo" class="logo" />
+          <img src="${process.env.SERVER_URL || 'https://ezyjobs-server.vercel.app'}/assets/logo.png" alt="EZY Jobs Logo" class="logo" />
           <div class="header" role="banner">
             <h1>EZY Jobs</h1>
             <h3 class="header-subheader">Making Job Search Easy</h3>
@@ -291,7 +291,7 @@ const generateEmailTemplate = ({ firstName, subject, content = [] }) => {
         </main>
         <footer class="footer" role="contentinfo">
           <p>
-            Visit <a href="https://opta-hire-fyp-app-client.vercel.app" style="color: var(--primary); text-decoration: none">EZY Jobs</a> to experience the full platform.
+            Visit <a href="${process.env.CLIENT_URL || 'https://ezyjobs-client.vercel.app'}" style="color: var(--primary); text-decoration: none">EZY Jobs</a> to experience the full platform.
           </p>
           <p>&copy; ${new Date().getFullYear()} EZY Jobs | Making Job Search Easy</p>
         </footer>

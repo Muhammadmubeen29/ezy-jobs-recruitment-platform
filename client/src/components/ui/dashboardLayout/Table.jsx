@@ -13,26 +13,36 @@ import {
 } from 'react-icons/fa';
 
 export default function Table({ columns, data, actions }) {
+  // FIXED: Initialize state with safe defaults to prevent crashes
+  // CRASH CAUSE: Component received undefined/null data prop causing .filter/.map errors
+  // SOLUTION: Normalize data to always be an array, validate props exist
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
   const PAGE_SIZE = 10;
+  
+  // FIXED: Ensure data is always an array to prevent undefined access errors
+  // CRASH PREVENTION: Default to empty array if data is undefined/null/invalid
+  const safeData = Array.isArray(data) ? data : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
 
   // Auto-detect if column should be sortable (avoid sorting complex renders with buttons/links)
+  // FIXED: Use safeColumns instead of columns to prevent crashes
   const enhancedColumns = useMemo(() => {
-    return columns.map((column) => ({
+    return safeColumns.map((column) => ({
       ...column,
       sortable:
         column.sortable !== false &&
         !column.render?.toString().includes('button') &&
         !column.render?.toString().includes('onClick'),
     }));
-  }, [columns]);
+  }, [safeColumns]);
 
   // Search functionality - searches across all columns
+  // FIXED: Use safeData instead of data to prevent crashes
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
+    if (!searchTerm) return safeData;
 
     return data.filter((row) =>
       enhancedColumns.some((column) => {
@@ -385,7 +395,7 @@ export default function Table({ columns, data, actions }) {
               </span>
               {searchTerm && (
                 <span className="ml-2 text-xs font-medium text-light-primary dark:text-dark-primary">
-                  (Filtered from {data.length})
+                  (Filtered from {safeData.length})
                 </span>
               )}
             </div>

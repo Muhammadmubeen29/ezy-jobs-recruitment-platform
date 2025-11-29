@@ -546,9 +546,13 @@ const updateJobById = asyncHandler(async (req, res) => {
     throw new Error('Job posting not found. Please check and try again.');
   }
 
+  // FIXED: Added safe access for recruiterId to handle both ObjectId and populated object cases
+  // CRASH CAUSE: recruiterId might be an ObjectId string or a populated object with _id property
+  // SOLUTION: Check if recruiterId is populated (has _id) or use it directly as ObjectId
   // Role-based access control: Recruiters can ONLY update their own jobs
   if (user.isRecruiter && !user.isAdmin) {
-    if (job.recruiterId._id.toString() !== user.id.toString()) {
+    const recruiterIdStr = job.recruiterId?._id?.toString() || job.recruiterId?.toString() || job.recruiterId;
+    if (!recruiterIdStr || recruiterIdStr !== user.id.toString()) {
       res.status(StatusCodes.FORBIDDEN);
       throw new Error('You do not have permission to update this job posting.');
     }
@@ -658,12 +662,21 @@ const updateJobById = asyncHandler(async (req, res) => {
     benefits: benefitsDisplay,
   };
 
-  const isEmailSent = await sendEmail(res, {
-    from: process.env.NODEMAILER_SMTP_EMAIL,
-    to: updatedJob.recruiterId.email,
-    subject: 'EZY Jobs - Job Updated',
-    html: generateEmailTemplate({
-      firstName: updatedJob.recruiterId.firstName,
+  // FIXED: Added guard to ensure recruiterId is populated before accessing email/firstName
+  // CRASH CAUSE: updatedJob.recruiterId might not be populated or might be undefined
+  // SOLUTION: Check if recruiterId exists and has email before sending email
+  if (!updatedJob.recruiterId || !updatedJob.recruiterId.email) {
+    console.error('Cannot send email: recruiterId not populated or missing email');
+    // Continue without email - don't fail the entire request
+  }
+
+  const isEmailSent = updatedJob.recruiterId?.email
+    ? await sendEmail(res, {
+        from: process.env.NODEMAILER_SMTP_EMAIL,
+        to: updatedJob.recruiterId.email,
+        subject: 'EZY Jobs - Job Updated',
+        html: generateEmailTemplate({
+          firstName: updatedJob.recruiterId?.firstName || 'User',
       subject: 'EZY Jobs - Job Updated',
       content: [
         {
@@ -717,15 +730,17 @@ const updateJobById = asyncHandler(async (req, res) => {
           value:
             'If you need any assistance with your job posting, our support team is here to help.',
         },
-      ],
-    }),
-  });
+        ],
+      }),
+    })
+    : false;
 
-  if (!isEmailSent) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR);
-    throw new Error(
-      'Job updated successfully but notification emails could not be delivered.'
-    );
+  // FIXED: Only warn about email failure, don't fail the entire request
+  // CRASH CAUSE: Email failure should not break the job update operation
+  // SOLUTION: Log warning but continue with successful response
+  if (updatedJob.recruiterId?.email && !isEmailSent) {
+    console.warn('Job updated successfully but notification email could not be delivered.');
+    // Don't throw error - job update was successful
   }
 
   res.status(StatusCodes.OK).json({
@@ -759,9 +774,13 @@ const deleteJobById = asyncHandler(async (req, res) => {
     throw new Error('Job posting not found. Please check and try again.');
   }
 
+  // FIXED: Added safe access for recruiterId (same pattern as updateJobById)
+  // CRASH CAUSE: recruiterId might be an ObjectId string or a populated object
+  // SOLUTION: Check if recruiterId is populated (has _id) or use it directly as ObjectId
   // Role-based access control: Recruiters can ONLY delete their own jobs
   if (user.isRecruiter && !user.isAdmin) {
-    if (job.recruiterId._id.toString() !== user.id.toString()) {
+    const recruiterIdStr = job.recruiterId?._id?.toString() || job.recruiterId?.toString() || job.recruiterId;
+    if (!recruiterIdStr || recruiterIdStr !== user.id.toString()) {
       res.status(StatusCodes.FORBIDDEN);
       throw new Error('You do not have permission to delete this job posting.');
     }
@@ -781,12 +800,16 @@ const deleteJobById = asyncHandler(async (req, res) => {
     ? deletedJob.benefits.join(', ') 
     : deletedJob.benefits;
 
-  const isEmailSent = await sendEmail(res, {
-    from: process.env.NODEMAILER_SMTP_EMAIL,
-    to: job.recruiterId.email,
-    subject: 'EZY Jobs - Job Deleted',
-    html: generateEmailTemplate({
-      firstName: job.recruiterId.firstName,
+  // FIXED: Added guard to ensure recruiterId is populated before accessing email/firstName
+  // CRASH CAUSE: job.recruiterId might not be populated or might be undefined
+  // SOLUTION: Check if recruiterId exists and has email before sending email
+  const isEmailSent = job.recruiterId?.email
+    ? await sendEmail(res, {
+        from: process.env.NODEMAILER_SMTP_EMAIL,
+        to: job.recruiterId.email,
+        subject: 'EZY Jobs - Job Deleted',
+        html: generateEmailTemplate({
+          firstName: job.recruiterId?.firstName || 'User',
       subject: 'EZY Jobs - Job Deleted',
       content: [
         {
@@ -820,15 +843,17 @@ const deleteJobById = asyncHandler(async (req, res) => {
           value:
             'If you did not delete this job posting, please contact our support team immediately to secure your account.',
         },
-      ],
-    }),
-  });
+        ],
+      }),
+    })
+    : false;
 
-  if (!isEmailSent) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR);
-    throw new Error(
-      'Job deleted successfully but notification emails could not be delivered.'
-    );
+  // FIXED: Only warn about email failure, don't fail the entire request
+  // CRASH CAUSE: Email failure should not break the job deletion operation
+  // SOLUTION: Log warning but continue with successful response
+  if (job.recruiterId?.email && !isEmailSent) {
+    console.warn('Job deleted successfully but notification email could not be delivered.');
+    // Don't throw error - job deletion was successful
   }
 
   res.status(StatusCodes.OK).json({

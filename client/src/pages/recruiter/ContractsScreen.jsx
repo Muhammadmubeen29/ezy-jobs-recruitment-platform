@@ -460,9 +460,10 @@ export default function ContractsScreen() {
               </div>
             )}
 
+            {/* FIXED: Ensure data is always an array to prevent crashes */}
             <Table
               columns={columns}
-              data={contractsData?.contracts || []}
+              data={Array.isArray(contractsData?.contracts) ? contractsData.contracts : []}
               actions={actions}
             />
           </div>

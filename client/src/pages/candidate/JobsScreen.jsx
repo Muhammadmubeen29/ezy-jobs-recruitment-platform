@@ -46,10 +46,16 @@ export default function JobsScreen() {
   };
 
   useEffect(() => {
-    if (jobsData) {
+    // FIXED: Added safety checks to prevent crashes when jobs array is undefined
+    // CRASH CAUSE: jobsData.jobs might be undefined or null
+    // SOLUTION: Validate array exists before filtering
+    if (jobsData && Array.isArray(jobsData.jobs)) {
       const filtered = jobsData.jobs.filter((job) => {
-        const jobTitle = job.title.toLowerCase();
-        const jobLocation = job.location.toLowerCase();
+        // Skip invalid jobs
+        if (!job) return false;
+        
+        const jobTitle = (job.title || '').toLowerCase();
+        const jobLocation = (job.location || '').toLowerCase();
         const search = searchTerm.toLowerCase();
         const loc = location.toLowerCase();
 
@@ -59,6 +65,8 @@ export default function JobsScreen() {
         );
       });
       setFilteredJobs(filtered);
+    } else {
+      setFilteredJobs([]);
     }
   }, [jobsData, searchTerm, location]);
 

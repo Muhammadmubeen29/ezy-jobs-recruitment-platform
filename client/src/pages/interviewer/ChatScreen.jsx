@@ -310,12 +310,22 @@ export default function ChatsScreen() {
   }, [isTyping, messageInput]);
 
   // Filter rooms
+  // FIXED: Added optional chaining to prevent crashes when interviewer, recruiter, or job are undefined
+  // CRASH CAUSE: API might return rooms with incomplete populated fields
+  // SOLUTION: Use optional chaining with fallback values
   const rooms = roomsData?.chatRooms || [];
   const filtered = rooms.filter((r) => {
-    const name = user.isRecruiter
+    if (!r) return false;
+    
+    const interviewerName = r.interviewer?.firstName && r.interviewer?.lastName
       ? `${r.interviewer.firstName} ${r.interviewer.lastName}`.toLowerCase()
-      : `${r.recruiter.firstName} ${r.recruiter.lastName}`.toLowerCase();
-    const title = r.job.title.toLowerCase();
+      : '';
+    const recruiterName = r.recruiter?.firstName && r.recruiter?.lastName
+      ? `${r.recruiter.firstName} ${r.recruiter.lastName}`.toLowerCase()
+      : '';
+    const name = user.isRecruiter ? interviewerName : recruiterName;
+    const title = r.job?.title?.toLowerCase() || '';
+    
     return (
       name.includes(searchTerm.toLowerCase()) ||
       title.includes(searchTerm.toLowerCase())
@@ -460,17 +470,18 @@ export default function ChatsScreen() {
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between">
+                  {/* FIXED: Added optional chaining for safe property access */}
                   <span className="font-medium text-light-text dark:text-dark-text">
                     {user.isRecruiter
-                      ? `${r.interviewer.firstName} ${r.interviewer.lastName}`
-                      : `${r.recruiter.firstName} ${r.recruiter.lastName}`}
+                      ? `${r.interviewer?.firstName || 'Unknown'} ${r.interviewer?.lastName || ''}`
+                      : `${r.recruiter?.firstName || 'Unknown'} ${r.recruiter?.lastName || ''}`}
                   </span>
                   <span className="text-xs text-light-text/60 dark:text-dark-text/60">
-                    {new Date(r.updatedAt).toLocaleDateString()}
+                    {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : ''}
                   </span>
                 </div>
                 <span className="truncate text-sm text-light-text/70 dark:text-dark-text/70">
-                  {r.job.title}
+                  {r.job?.title || 'No title'}
                 </span>
               </div>
             </button>

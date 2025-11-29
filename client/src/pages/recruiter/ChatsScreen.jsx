@@ -310,12 +310,23 @@ export default function ChatsScreen() {
   }, [isTyping, messageInput]);
 
   // Filter rooms
+  // FIXED: Added optional chaining to prevent crashes when interviewer, recruiter, or job are undefined
+  // CRASH CAUSE: API might return rooms with incomplete populated fields (interviewer, recruiter, job)
+  // SOLUTION: Use optional chaining (?.firstName) and provide fallback empty strings for safe string operations
   const rooms = roomsData?.chatRooms || [];
   const filtered = rooms.filter((r) => {
-    const name = user.isRecruiter
+    // Skip rooms with missing required data
+    if (!r) return false;
+    
+    const interviewerName = r.interviewer?.firstName && r.interviewer?.lastName
       ? `${r.interviewer.firstName} ${r.interviewer.lastName}`.toLowerCase()
-      : `${r.recruiter.firstName} ${r.recruiter.lastName}`.toLowerCase();
-    const title = r.job.title.toLowerCase();
+      : '';
+    const recruiterName = r.recruiter?.firstName && r.recruiter?.lastName
+      ? `${r.recruiter.firstName} ${r.recruiter.lastName}`.toLowerCase()
+      : '';
+    const name = user.isRecruiter ? interviewerName : recruiterName;
+    const title = r.job?.title?.toLowerCase() || '';
+    
     return (
       name.includes(searchTerm.toLowerCase()) ||
       title.includes(searchTerm.toLowerCase())
@@ -460,17 +471,21 @@ export default function ChatsScreen() {
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between">
+                  {/* FIXED: Added optional chaining to prevent crashes when interviewer/recruiter are undefined
+                      CRASH CAUSE: API might return rooms with unpopulated interviewer/recruiter fields
+                      SOLUTION: Use optional chaining (?.firstName) with fallback to 'Unknown' */}
                   <span className="font-medium text-light-text dark:text-dark-text">
                     {user.isRecruiter
-                      ? `${r.interviewer.firstName} ${r.interviewer.lastName}`
-                      : `${r.recruiter.firstName} ${r.recruiter.lastName}`}
+                      ? `${r.interviewer?.firstName || 'Unknown'} ${r.interviewer?.lastName || ''}`
+                      : `${r.recruiter?.firstName || 'Unknown'} ${r.recruiter?.lastName || ''}`}
                   </span>
                   <span className="text-xs text-light-text/60 dark:text-dark-text/60">
-                    {new Date(r.updatedAt).toLocaleDateString()}
+                    {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : ''}
                   </span>
                 </div>
+                {/* FIXED: Added optional chaining for job title */}
                 <span className="truncate text-sm text-light-text/70 dark:text-dark-text/70">
-                  {r.job.title}
+                  {r.job?.title || 'No title'}
                 </span>
               </div>
             </button>
@@ -673,7 +688,10 @@ export default function ChatsScreen() {
       );
     if (!roomDetails?.chatRoom) return null;
 
-    const { job, interviewer } = roomDetails.chatRoom;
+    // FIXED: Added safe destructuring with defaults to prevent undefined access
+    // CRASH CAUSE: API might return chatRoom with unpopulated job or interviewer
+    // SOLUTION: Destructure with default empty objects to ensure safe property access
+    const { job = {}, interviewer = {} } = roomDetails.chatRoom || {};
 
     return (
       <div className="h-full space-y-4 overflow-y-auto p-4">
@@ -682,15 +700,18 @@ export default function ChatsScreen() {
           <h3 className="mb-2 flex items-center gap-2 font-semibold text-light-primary dark:text-dark-primary">
             <FaBriefcase /> Job Details
           </h3>
+          {/* FIXED: Added optional chaining for job fields
+              CRASH CAUSE: job might be undefined or missing title/location/salaryRange
+              SOLUTION: Use optional chaining (?.title) with fallback values */}
           <div>
             <div className="font-medium text-light-text dark:text-dark-text">
-              {job.title}
+              {job?.title || 'No title'}
             </div>
             <div className="flex items-center gap-1 text-sm text-light-text/70 dark:text-dark-text/70">
-              <FaMapMarkerAlt /> {job.location}
+              <FaMapMarkerAlt /> {job?.location || 'No location'}
             </div>
             <div className="mt-1 flex items-center gap-1 text-sm text-light-text/70 dark:text-dark-text/70">
-              <FaDollarSign /> {job.salaryRange}
+              <FaDollarSign /> {job?.salaryRange || 'Not specified'}
             </div>
           </div>
         </div>
@@ -704,12 +725,15 @@ export default function ChatsScreen() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-light-primary bg-opacity-20 dark:bg-dark-primary dark:bg-opacity-20">
               <FaUser className="text-light-primary dark:text-dark-primary" />
             </div>
+            {/* FIXED: Added optional chaining for interviewer fields
+                CRASH CAUSE: interviewer might be undefined or missing firstName/lastName
+                SOLUTION: Use optional chaining (?.firstName) with fallback values */}
             <div>
               <div className="font-medium text-light-text dark:text-dark-text">
-                {interviewer.firstName} {interviewer.lastName}
+                {interviewer?.firstName || 'Unknown'} {interviewer?.lastName || ''}
               </div>
               <div className="text-sm text-light-text/70 dark:text-dark-text/70">
-                {interviewer.email}
+                {interviewer?.email || 'No email'}
               </div>
             </div>
           </div>
@@ -748,8 +772,11 @@ export default function ChatsScreen() {
                       size={12}
                     />
                   </div>
+                  {/* FIXED: Added optional chaining for participant fields
+                      CRASH CAUSE: Participants array might contain objects without firstName/lastName
+                      SOLUTION: Use optional chaining (?.firstName) with fallback to 'Unknown' */}
                   <span className="text-sm text-light-text dark:text-dark-text">
-                    {p.firstName} {p.lastName}
+                    {p?.firstName || 'Unknown'} {p?.lastName || ''}
                   </span>
                 </div>
                 <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-900 dark:text-green-100">

@@ -150,25 +150,30 @@ export default function RatingsScreen() {
     {
       key: 'interviewer',
       label: 'Interviewer',
+      // FIXED: Added optional chaining to prevent crashes when interviewer is undefined
+      // CRASH CAUSE: API might return ratings with unpopulated interviewer fields
+      // SOLUTION: Use optional chaining (?.firstName) with fallback to 'Unknown'
       render: (rating) => (
         <span className="text-light-text/70 dark:text-dark-text/70">
-          {`${rating.interviewer.firstName} ${rating.interviewer.lastName}`}
+          {`${rating?.interviewer?.firstName || 'Unknown'} ${rating?.interviewer?.lastName || ''}`.trim() || 'Unknown Interviewer'}
         </span>
       ),
     },
     {
       key: 'job',
       label: 'Job',
+      // FIXED: Added optional chaining for job.title
       render: (rating) => (
         <span className="text-light-text/70 dark:text-dark-text/70">
-          {rating.job.title}
+          {rating?.job?.title || 'Job Not Found'}
         </span>
       ),
     },
     {
       key: 'company',
       label: 'Company',
-      render: (rating) => rating.job.company,
+      // FIXED: Added optional chaining for job.company
+      render: (rating) => rating?.job?.company || 'N/A',
     },
     {
       key: 'rating',
@@ -285,12 +290,13 @@ export default function RatingsScreen() {
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         Interviewer
                       </p>
+                      {/* FIXED: Added optional chaining for interviewer fields */}
                       <p className="break-words text-lg font-medium text-light-text dark:text-dark-text">
-                        {selectedRating.interviewer.firstName}{' '}
-                        {selectedRating.interviewer.lastName}
+                        {selectedRating?.interviewer?.firstName || 'Unknown'}{' '}
+                        {selectedRating?.interviewer?.lastName || ''}
                       </p>
                       <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
-                        {selectedRating.interviewer.email}
+                        {selectedRating?.interviewer?.email || 'No email'}
                       </p>
                     </div>
                   </div>
@@ -308,11 +314,12 @@ export default function RatingsScreen() {
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         Job
                       </p>
+                      {/* FIXED: Added optional chaining for job fields */}
                       <p className="text-lg font-medium text-light-text dark:text-dark-text">
-                        {selectedRating.job.title}
+                        {selectedRating?.job?.title || 'Job Not Found'}
                       </p>
                       <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
-                        {selectedRating.job.company}
+                        {selectedRating?.job?.company || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -415,9 +422,10 @@ export default function RatingsScreen() {
                 onChange={handleContractChange}
                 options={[
                   { value: '', label: 'Select a contract' },
+                  // FIXED: Added optional chaining for contract fields
                   ...(contractsData?.contracts || []).map((contract) => ({
                     value: contract.id,
-                    label: `${contract.job.title} - ${contract.interviewer.firstName} ${contract.interviewer.lastName}`,
+                    label: `${contract?.job?.title || 'Unknown Job'} - ${contract?.interviewer?.firstName || 'Unknown'} ${contract?.interviewer?.lastName || ''}`,
                   })),
                 ]}
               />
@@ -425,13 +433,14 @@ export default function RatingsScreen() {
               {selectedContract && (
                 <div className="mb-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
                   <h3 className="mb-2 font-medium">Contract Details</h3>
+                  {/* FIXED: Added optional chaining for selectedContract fields */}
                   <p>
-                    <strong>Job:</strong> {selectedContract.job.title}
+                    <strong>Job:</strong> {selectedContract?.job?.title || 'N/A'}
                   </p>
                   <p>
                     <strong>Interviewer:</strong>{' '}
-                    {selectedContract.interviewer.firstName}{' '}
-                    {selectedContract.interviewer.lastName}
+                    {selectedContract?.interviewer?.firstName || 'Unknown'}{' '}
+                    {selectedContract?.interviewer?.lastName || ''}
                   </p>
                   <p>
                     <strong>Status:</strong> {selectedContract.status}

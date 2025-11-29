@@ -6,15 +6,20 @@ export const axiosBaseQuery =
     try {
       const accessToken = getState().auth.accessToken;
 
+      // FIXED: Only add Authorization header if token exists and is valid
+      // CRASH CAUSE: Empty Authorization header can cause backend to reject requests
+      // SOLUTION: Only include Authorization header when accessToken is truthy and non-empty
+      const requestHeaders = { ...headers };
+      if (accessToken && typeof accessToken === 'string' && accessToken.trim() !== '') {
+        requestHeaders.Authorization = `Bearer ${accessToken.trim()}`;
+      }
+
       const result = await axiosInstance({
         url,
         method,
         data,
         params,
-        headers: {
-          ...headers,
-          Authorization: accessToken ? `Bearer ${accessToken}` : '',
-        },
+        headers: requestHeaders,
         ...rest,
       });
 

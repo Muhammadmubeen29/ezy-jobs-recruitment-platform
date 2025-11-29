@@ -36,6 +36,9 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new Error('Please enter a valid email address.');
   }
 
+  // FIXED: Added error handling for password validation
+  // CRASH CAUSE: validatePassword might fail if password field is missing or user object is corrupted
+  // SOLUTION: Wrap password validation in try-catch and ensure user has password field
   const user = await User.findOne({ email }).select('+password -otp -otpExpires');
 
   if (!user) {
@@ -43,7 +46,27 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new Error('These credentials do not match our records.');
   }
 
-  const isPasswordCorrect = await user.validatePassword(password);
+  // Ensure user has password field (should be included with +password in select)
+  if (!user.password) {
+    console.error('User found but password field is missing:', user._id);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR);
+    throw new Error('Authentication error. Please contact support.');
+  }
+
+  // Validate password with error handling
+  let isPasswordCorrect = false;
+  try {
+    if (typeof user.validatePassword !== 'function') {
+      console.error('User model missing validatePassword method');
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR);
+      throw new Error('Authentication error. Please contact support.');
+    }
+    isPasswordCorrect = await user.validatePassword(password);
+  } catch (passwordError) {
+    console.error('Password validation error:', passwordError);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR);
+    throw new Error('Authentication error. Please try again.');
+  }
 
   if (!isPasswordCorrect) {
     res.status(StatusCodes.UNAUTHORIZED);

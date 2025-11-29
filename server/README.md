@@ -74,9 +74,9 @@
 
 ## About The Server
 
-The OptaHire server backend is a comprehensive RESTful API built with Node.js and Express.js, designed to power the AI-driven recruitment platform. The server provides a robust foundation for managing users, job postings, applications, interviews, payments, and real-time communications. Built with scalability and security in mind, the backend features comprehensive authentication, role-based authorization, payment processing with Stripe, real-time chat functionality with Socket.io, and WebRTC support for video interviews.
+The EZY Jobs server backend is a comprehensive RESTful API built with Node.js and Express.js, designed to power the AI-driven recruitment platform. The server provides a robust foundation for managing users, job postings, applications, interviews, payments, and real-time communications. Built with scalability and security in mind, the backend features comprehensive authentication, role-based authorization, payment processing with Stripe, real-time chat functionality with Socket.io, and WebRTC support for video interviews.
 
-The architecture follows modern backend development patterns with clear separation of concerns through controllers, models, routes, and middleware. The server utilizes PostgreSQL with Sequelize ORM for robust data management, implements JWT-based authentication with refresh token capabilities, and includes comprehensive API documentation with Swagger. Security features include rate limiting, XSS protection, CORS configuration, and input validation, while the modular design ensures maintainability and extensibility for future enhancements.
+The architecture follows modern backend development patterns with clear separation of concerns through controllers, models, routes, and middleware. The server utilizes MongoDB with Mongoose ODM for robust data management, implements JWT-based authentication with refresh token capabilities, and includes comprehensive API documentation with Swagger. Security features include rate limiting, XSS protection, CORS configuration, and input validation, while the modular design ensures maintainability and extensibility for future enhancements.
 
 ## API Endpoints
 
@@ -222,7 +222,7 @@ server/
 │   ├── payment.controller.js   # Payment processing
 │   ├── transaction.controller.js # Transaction management
 │   └── interviewerRating.controller.js # Rating system
-├── models/                     # Sequelize database models
+├── models/                     # Mongoose database models
 │   ├── index.js               # Model associations and exports
 │   ├── user.js                # User model definition
 │   ├── job.js                 # Job model definition
@@ -267,7 +267,7 @@ server/
 ### Core Components
 
 - **Express Application**: RESTful API server with comprehensive middleware stack
-- **Sequelize ORM**: Database abstraction layer with PostgreSQL support
+- **Mongoose ODM**: Database abstraction layer with MongoDB support
 - **JWT Authentication**: Secure token-based authentication with refresh tokens
 - **Socket.io**: Real-time bidirectional communication for chat and notifications
 - **Stripe Integration**: Secure payment processing and webhook handling
@@ -336,7 +336,7 @@ socket.on('ice_candidate', (data) => {
 
 - **Node.js** (v22.x or higher) - JavaScript runtime environment
 - **npm** (v10.x or higher) - Node package manager
-- **PostgreSQL** - Database server
+- **MongoDB** - Database server (MongoDB Atlas or local MongoDB instance)
 - **Stripe Account** - For payment processing (optional for basic functionality)
 
 ### Installation
@@ -355,25 +355,21 @@ socket.on('ice_candidate', (data) => {
 
 ### Database Setup
 
-1. **Install PostgreSQL and create database**
+1. **Install MongoDB or use MongoDB Atlas**
 
-   ```bash
-   # Create database
-   createdb ezyjobs
-   ```
+   - **Local MongoDB**: Install MongoDB Community Edition from [mongodb.com](https://www.mongodb.com/try/download/community)
+   - **MongoDB Atlas**: Create a free cluster at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
 
-2. **Run database migrations**
+2. **Get MongoDB Connection String**
 
-   ```bash
-   # Create database tables
-   npx sequelize-cli db:migrate
-   ```
+   - For local MongoDB: `mongodb://localhost:27017/ezyjobs`
+   - For MongoDB Atlas: Get connection string from Atlas dashboard
 
 3. **Seed the database with initial data**
 
    ```bash
    # Populate with demo data
-   npx sequelize-cli db:seed:all
+   npm run seed
    ```
 
 ### Environment Configuration
@@ -388,13 +384,10 @@ SERVER_URL=http://localhost:5000
 CLIENT_URL=http://localhost:5173
 CORS_ORIGIN=http://localhost:5173
 
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/ezyjobs
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-DB_DATABASE=ezyjobs
-DB_HOST=localhost
-DB_PORT=5432
+# Database Configuration (MongoDB)
+MONGODB_URI=mongodb://localhost:27017/ezyjobs
+# OR for MongoDB Atlas:
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ezyjobs
 
 # Authentication
 JWT_ACCESS_TOKEN_SECRET=your_access_token_secret_minimum_32_characters
@@ -443,10 +436,7 @@ The server will start on:
 - **xss-clean 0.1.4** - XSS protection middleware
 - **cookie-parser 1.4.7** - Cookie parsing middleware
 - **body-parser 1.20.3** - Request body parsing middleware
-- **sequelize 6.37.5** - Promise-based ORM for PostgreSQL
-- **pg 8.13.1** - PostgreSQL client for Node.js
-- **pg-hstore 2.3.4** - Serializing and deserializing JSON data
-- **sequelize-cli 6.6.2** - Command line interface for Sequelize
+- **mongoose 8.0.0** - MongoDB object modeling tool (ODM)
 - **jsonwebtoken 9.0.2** - JWT token generation and verification
 - **bcryptjs 2.4.3** - Password hashing and verification
 - **email-validator 2.0.4** - Email address validation
@@ -477,7 +467,7 @@ The server is configured for multiple deployment platforms:
 
    ```bash
    heroku config:set NODE_ENV=production
-   heroku config:set DATABASE_URL=your_production_db_url
+   heroku config:set MONGODB_URI=your_production_mongodb_uri
    heroku config:set JWT_ACCESS_TOKEN_SECRET=your_secret
    ```
 
@@ -512,12 +502,12 @@ The documentation includes:
 - **Error Tracking**: Comprehensive error handling and logging
 - **Performance Monitoring**: Request timing and resource usage tracking
 - **Health Checks**: API endpoint health monitoring
-- **Database Monitoring**: Sequelize query logging and performance tracking
+- **Database Monitoring**: Mongoose query logging and performance tracking
 
 ## Development Tools
 
 - **Nodemon**: Automatic server restart during development
-- **Sequelize CLI**: Database migration and seeding management
+- **Mongoose Seeder**: Database seeding script for initial data
 - **ESLint**: Code linting and style enforcement
 - **Prettier**: Code formatting and consistency
 - **Swagger**: Interactive API documentation and testing
@@ -570,4 +560,4 @@ Give ⭐️ if you like this project!
 
 ---
 
-Part of the [OptaHire Project](https://github.com/itxsaaad/opta-hire-ai-recruitment-fyp-app-pern) | Licensed under MIT License
+Part of the [EZY Jobs Project](https://github.com/itxsaaad/ezyjobs-ai-recruitment-fyp-app-mern) | Licensed under MIT License

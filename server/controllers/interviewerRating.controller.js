@@ -222,11 +222,36 @@ const getAllInterviewerRatings = asyncHandler(async (req, res) => {
     });
   }
 
+  // FIXED: Normalize ratings to ensure populated fields exist
+  // CRASH CAUSE: interviewerId, jobId, recruiterId might be null/undefined after populate
+  // SOLUTION: Transform ratings to ensure safe structure with defaults
+  const normalizedRatings = interviewerRatings.map((rating) => {
+    const ratingObj = rating.toObject ? rating.toObject() : rating;
+    return {
+      ...ratingObj,
+      id: ratingObj._id || ratingObj.id,
+      interviewer: ratingObj.interviewerId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      recruiter: ratingObj.recruiterId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      job: ratingObj.jobId || {
+        title: 'Job Not Found',
+        company: 'N/A',
+      },
+    };
+  });
+
   res.status(StatusCodes.OK).json({
     success: true,
-    message: `Successfully retrieved ${interviewerRatings.length} ratings`,
-    count: interviewerRatings.length,
-    interviewerRatings,
+    message: `Successfully retrieved ${normalizedRatings.length} ratings`,
+    count: normalizedRatings.length,
+    interviewerRatings: normalizedRatings,
     timestamp: new Date().toISOString(),
   });
 });
@@ -329,11 +354,11 @@ const updateInterviewerRating = asyncHandler(async (req, res) => {
     {
       type: 'list',
       value: [
-        `Job Title: ${interviewerRating.job.title}`,
+        `Job Title: ${interviewerRating.jobId?.title || interviewerRating.job?.title || 'N/A'}`,
         `Rating: ${updatedInterviewerRating.rating}/5`,
-        `Feedback: ${updatedInterviewerRating.feedback}`,
-        `Company: ${interviewerRating.job.company}`,
-        `Contract ID: ${interviewerRating.contractId}`,
+        `Feedback: ${updatedInterviewerRating.feedback || 'N/A'}`,
+        `Company: ${interviewerRating.jobId?.company || interviewerRating.job?.company || 'N/A'}`,
+        `Contract ID: ${interviewerRating.contractId || 'N/A'}`,
       ],
     },
     {
@@ -363,12 +388,38 @@ const updateInterviewerRating = asyncHandler(async (req, res) => {
     },
   ];
 
+  // FIXED: Added guard to ensure interviewer exists before sending email
+  // CRASH CAUSE: interviewerRating.interviewer might not be populated
+  // SOLUTION: Check interviewer exists and has email before sending
+  if (!interviewerRating.interviewerId || (!interviewerRating.interviewer && !interviewerRating.interviewerId.email)) {
+    console.warn('Rating updated but interviewer not found - skipping email notification');
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Rating updated successfully',
+      interviewerRating: updatedInterviewerRating,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const interviewerEmail = interviewerRating.interviewer?.email || interviewerRating.interviewerId?.email;
+  const interviewerFirstName = interviewerRating.interviewer?.firstName || interviewerRating.interviewerId?.firstName || 'User';
+
+  if (!interviewerEmail) {
+    console.warn('Rating updated but interviewer email missing - skipping email notification');
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Rating updated successfully',
+      interviewerRating: updatedInterviewerRating,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const isEmailSent = await sendEmail(res, {
     from: process.env.NODEMAILER_SMTP_EMAIL,
-    to: interviewerRating.interviewer.email,
+    to: interviewerEmail,
     subject: 'EZY Jobs - Rating Update',
     html: generateEmailTemplate({
-      firstName: interviewerRating.interviewer.firstName,
+      firstName: interviewerFirstName,
       subject: 'Rating Update Notification',
       content: emailContent,
     }),
@@ -436,11 +487,11 @@ const deleteInterviewerRating = asyncHandler(async (req, res) => {
     {
       type: 'list',
       value: [
-        `Job Title: ${interviewerRating.job.title}`,
+        `Job Title: ${interviewerRating.jobId?.title || interviewerRating.job?.title || 'N/A'}`,
         `Rating: ${interviewerRating.rating}/5`,
-        `Feedback: ${interviewerRating.feedback}`,
-        `Company: ${interviewerRating.job.company}`,
-        `Contract ID: ${interviewerRating.contractId}`,
+        `Feedback: ${interviewerRating.feedback || 'N/A'}`,
+        `Company: ${interviewerRating.jobId?.company || interviewerRating.job?.company || 'N/A'}`,
+        `Contract ID: ${interviewerRating.contractId || 'N/A'}`,
       ],
     },
     {
@@ -470,12 +521,36 @@ const deleteInterviewerRating = asyncHandler(async (req, res) => {
     },
   ];
 
+  // FIXED: Added guard to ensure interviewer exists before sending email
+  // CRASH CAUSE: interviewerRating.interviewer might not be populated
+  // SOLUTION: Check interviewer exists and has email before sending
+  if (!interviewerRating.interviewerId || (!interviewerRating.interviewer && !interviewerRating.interviewerId.email)) {
+    console.warn('Rating deleted but interviewer not found - skipping email notification');
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Rating deleted successfully',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const interviewerEmail = interviewerRating.interviewer?.email || interviewerRating.interviewerId?.email;
+  const interviewerFirstName = interviewerRating.interviewer?.firstName || interviewerRating.interviewerId?.firstName || 'User';
+
+  if (!interviewerEmail) {
+    console.warn('Rating deleted but interviewer email missing - skipping email notification');
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Rating deleted successfully',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const isEmailSent = await sendEmail(res, {
     from: process.env.NODEMAILER_SMTP_EMAIL,
-    to: interviewerRating.interviewer.email,
+    to: interviewerEmail,
     subject: 'EZY Jobs - Rating Deletion Notification',
     html: generateEmailTemplate({
-      firstName: interviewerRating.interviewer.firstName,
+      firstName: interviewerFirstName,
       subject: 'Rating Deletion Notification',
       content: emailContent,
     }),
@@ -526,11 +601,34 @@ const getInterviewerRatingsByJob = asyncHandler(async (req, res) => {
     });
   }
 
+  // FIXED: Normalize ratings data (same pattern as getAllInterviewerRatings)
+  const normalizedRatings = interviewerRatings.map((rating) => {
+    const ratingObj = rating.toObject ? rating.toObject() : rating;
+    return {
+      ...ratingObj,
+      id: ratingObj._id || ratingObj.id,
+      interviewer: ratingObj.interviewerId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      recruiter: ratingObj.recruiterId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      job: ratingObj.jobId || {
+        title: 'Job Not Found',
+        company: 'N/A',
+      },
+    };
+  });
+
   res.status(StatusCodes.OK).json({
     success: true,
-    message: `Successfully retrieved ${interviewerRatings.length} ratings`,
-    count: interviewerRatings.length,
-    interviewerRatings,
+    message: `Successfully retrieved ${normalizedRatings.length} ratings`,
+    count: normalizedRatings.length,
+    interviewerRatings: normalizedRatings,
     timestamp: new Date().toISOString(),
   });
 });
@@ -569,11 +667,34 @@ const getInterviewerRatingsByContract = asyncHandler(async (req, res) => {
     });
   }
 
+  // FIXED: Normalize ratings data (same pattern as getAllInterviewerRatings)
+  const normalizedRatings = interviewerRatings.map((rating) => {
+    const ratingObj = rating.toObject ? rating.toObject() : rating;
+    return {
+      ...ratingObj,
+      id: ratingObj._id || ratingObj.id,
+      interviewer: ratingObj.interviewerId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      recruiter: ratingObj.recruiterId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+      job: ratingObj.jobId || {
+        title: 'Job Not Found',
+        company: 'N/A',
+      },
+    };
+  });
+
   res.status(StatusCodes.OK).json({
     success: true,
-    message: `Successfully retrieved ${interviewerRatings.length} ratings`,
-    count: interviewerRatings.length,
-    interviewerRatings,
+    message: `Successfully retrieved ${normalizedRatings.length} ratings`,
+    count: normalizedRatings.length,
+    interviewerRatings: normalizedRatings,
     timestamp: new Date().toISOString(),
   });
 });

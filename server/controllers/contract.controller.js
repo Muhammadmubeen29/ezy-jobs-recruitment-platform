@@ -253,11 +253,35 @@ const getAllContracts = asyncHandler(async (req, res) => {
     });
   }
 
+  // FIXED: Normalize contracts to ensure populated fields exist
+  // CRASH CAUSE: jobId, interviewerId, recruiterId might be null/undefined after populate
+  // SOLUTION: Transform contracts to ensure safe structure with defaults
+  const normalizedContracts = contracts.map((contract) => {
+    const contractObj = contract.toObject ? contract.toObject() : contract;
+    return {
+      ...contractObj,
+      id: contractObj._id || contractObj.id,
+      job: contractObj.jobId || { title: 'Job Not Found', description: '', isClosed: false },
+      interviewer: contractObj.interviewerId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+        payoutEnabled: false,
+        stripeAccountId: null,
+      },
+      recruiter: contractObj.recruiterId || {
+        firstName: 'Unknown',
+        lastName: '',
+        email: 'N/A',
+      },
+    };
+  });
+
   res.status(StatusCodes.OK).json({
     success: true,
-    message: `Successfully retrieved ${contracts.length} contracts`,
-    count: contracts.length,
-    contracts,
+    message: `Successfully retrieved ${normalizedContracts.length} contracts`,
+    count: normalizedContracts.length,
+    contracts: normalizedContracts,
     timestamp: new Date().toISOString(),
   });
 });
