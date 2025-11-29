@@ -1,5 +1,5 @@
 const colors = require('colors');
-// Removed Sequelize import - using Mongoose now
+const mongoose = require('mongoose');
 
 const { Application, Job, Interview, User } = require('../models');
 
@@ -45,58 +45,41 @@ const setupVideoCallSocket = (io) => {
       }
 
       try {
+        // Build query for interview
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+        const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
         const interview = await Interview.findOne({
-          where: {
-            roomId,
-            [Op.and]: [
-              { status: { [Op.in]: ['scheduled', 'ongoing'] } },
-              {
-                [Op.or]: [
-                  { status: 'ongoing' },
-                  {
-                    status: 'scheduled',
-                    scheduledTime: {
-                      [Op.between]: [
-                        new Date(Date.now() - 5 * 60 * 1000),
-                        new Date(Date.now() + 60 * 60 * 1000),
-                      ],
-                    },
+          roomId,
+          $and: [
+            {
+              $or: [
+                { interviewerId: new mongoose.Types.ObjectId(socket.user.id) },
+                { candidateId: new mongoose.Types.ObjectId(socket.user.id) },
+              ],
+            },
+            {
+              status: { $in: ['scheduled', 'ongoing'] },
+            },
+            {
+              $or: [
+                { status: 'ongoing' },
+                {
+                  status: 'scheduled',
+                  scheduledTime: {
+                    $gte: fiveMinutesAgo,
+                    $lte: oneHourLater,
                   },
-                ],
-              },
-              {
-                [Op.or]: [
-                  { interviewerId: socket.user.id },
-                  { candidateId: socket.user.id },
-                ],
-              },
-            ],
-          },
-          include: [
-            {
-              model: User,
-              as: 'interviewer',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: User,
-              as: 'candidate',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: Job,
-              as: 'job',
-              attributes: ['id', 'title', 'company', 'description'],
-            },
-            {
-              model: Application,
-              as: 'application',
-              attributes: ['id', 'status'],
+                },
+              ],
             },
           ],
-        });
-
-        console.log(`🔍 Interview found: ${JSON.stringify(interview)}`.yellow);
+        })
+          .populate('interviewerId', 'id firstName lastName email')
+          .populate('candidateId', 'id firstName lastName email')
+          .populate('jobId', 'id title company description')
+          .populate('applicationId', 'id status');
 
         if (!interview) {
           console.log(`❌ Interview not found for room ID: ${roomId}`.red);
@@ -107,10 +90,16 @@ const setupVideoCallSocket = (io) => {
           return;
         }
 
-        if (
-          socket.user.id !== interview.interviewerId &&
-          socket.user.id !== interview.candidateId
-        ) {
+        // Check authorization
+        const interviewerIdStr = interview.interviewerId._id 
+          ? interview.interviewerId._id.toString() 
+          : interview.interviewerId.toString();
+        const candidateIdStr = interview.candidateId._id 
+          ? interview.candidateId._id.toString() 
+          : interview.candidateId.toString();
+        const userIdStr = socket.user.id.toString();
+
+        if (userIdStr !== interviewerIdStr && userIdStr !== candidateIdStr) {
           socket.emit(
             'error',
             formatResponse(
@@ -164,16 +153,28 @@ const setupVideoCallSocket = (io) => {
         );
 
         if (room.size === 1 && interview.status === 'scheduled') {
-          await interview.update({
-            callStartedAt: new Date(),
-            status: 'ongoing',
-            remarks: generateRemarks(
-              'ongoing',
-              `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
-              `${interview.candidate.firstName} ${interview.candidate.lastName}`,
-              interview.job.title
-            ),
-          });
+          const jobTitle = interview.jobId.title || interview.jobId;
+          const interviewerName = interview.interviewerId.firstName 
+            ? `${interview.interviewerId.firstName} ${interview.interviewerId.lastName}`
+            : 'Interviewer';
+          const candidateName = interview.candidateId.firstName
+            ? `${interview.candidateId.firstName} ${interview.candidateId.lastName}`
+            : 'Candidate';
+
+          await Interview.findByIdAndUpdate(
+            interview._id,
+            {
+              callStartedAt: new Date(),
+              status: 'ongoing',
+              remarks: generateRemarks(
+                'ongoing',
+                interviewerName,
+                candidateName,
+                jobTitle
+              ),
+            },
+            { new: true }
+          );
           console.log(`🔄 Updated interview status to "ongoing"`.cyan);
         }
 
@@ -183,24 +184,36 @@ const setupVideoCallSocket = (io) => {
             .cyan
         );
 
+        const job = interview.jobId._id ? interview.jobId : interview.jobId;
+        const interviewer = interview.interviewerId._id 
+          ? interview.interviewerId 
+          : interview.interviewerId;
+        const candidate = interview.candidateId._id 
+          ? interview.candidateId 
+          : interview.candidateId;
+
         const interviewDetails = {
-          id: interview.id,
+          id: interview._id,
           roomId: interview.roomId,
           scheduledTime: interview.scheduledTime,
           callStartedAt: interview.callStartedAt,
           status: interview.status,
           job: {
-            id: interview.job.id,
-            title: interview.job.title,
-            company: interview.job.company,
+            id: job._id || job,
+            title: job.title || 'N/A',
+            company: job.company || 'N/A',
           },
           interviewer: {
-            id: interview.interviewer.id,
-            name: `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
+            id: interviewer._id || interviewer,
+            name: interviewer.firstName 
+              ? `${interviewer.firstName} ${interviewer.lastName}`
+              : 'Interviewer',
           },
           candidate: {
-            id: interview.candidate.id,
-            name: `${interview.candidate.firstName} ${interview.candidate.lastName}`,
+            id: candidate._id || candidate,
+            name: candidate.firstName
+              ? `${candidate.firstName} ${candidate.lastName}`
+              : 'Candidate',
           },
         };
 
@@ -278,50 +291,42 @@ const setupVideoCallSocket = (io) => {
 
       try {
         const interview = await Interview.findOne({
-          where: {
-            roomId,
-            status: { [Op.in]: ['scheduled', 'ongoing'] },
-            interviewerId: socket.user.id,
-          },
-          include: [
-            {
-              model: User,
-              as: 'interviewer',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: User,
-              as: 'candidate',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: Job,
-              as: 'job',
-              attributes: ['id', 'title', 'company', 'description'],
-            },
-            {
-              model: Application,
-              as: 'application',
-              attributes: ['id', 'status'],
-            },
-          ],
-        });
+          roomId,
+          status: { $in: ['scheduled', 'ongoing'] },
+          interviewerId: new mongoose.Types.ObjectId(socket.user.id),
+        })
+          .populate('interviewerId', 'id firstName lastName email')
+          .populate('candidateId', 'id firstName lastName email')
+          .populate('jobId', 'id title company description')
+          .populate('applicationId', 'id status');
 
         if (!interview) {
           socket.emit('error', formatResponse(false, 'Interview not found'));
           return;
         }
 
-        await interview.update({
-          callEndedAt: new Date(),
-          status: 'completed',
-          remarks: generateRemarks(
-            'completed',
-            `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
-            `${interview.candidate.firstName} ${interview.candidate.lastName}`,
-            interview.job.title
-          ),
-        });
+        const jobTitle = interview.jobId.title || interview.jobId;
+        const interviewerName = interview.interviewerId.firstName 
+          ? `${interview.interviewerId.firstName} ${interview.interviewerId.lastName}`
+          : 'Interviewer';
+        const candidateName = interview.candidateId.firstName
+          ? `${interview.candidateId.firstName} ${interview.candidateId.lastName}`
+          : 'Candidate';
+
+        await Interview.findByIdAndUpdate(
+          interview._id,
+          {
+            callEndedAt: new Date(),
+            status: 'completed',
+            remarks: generateRemarks(
+              'completed',
+              interviewerName,
+              candidateName,
+              jobTitle
+            ),
+          },
+          { new: true }
+        );
 
         videoCallNamespace.to(roomId).emit(
           'call-ended',
@@ -575,42 +580,35 @@ const setupVideoCallSocket = (io) => {
           }
         });
 
-        const interview = await Interview.findOne({
-          where: { roomId },
-          include: [
-            {
-              model: User,
-              as: 'interviewer',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: User,
-              as: 'candidate',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: Job,
-              as: 'job',
-              attributes: ['id', 'title', 'company', 'description'],
-            },
-            {
-              model: Application,
-              as: 'application',
-              attributes: ['id', 'status'],
-            },
-          ],
-        });
+        const interview = await Interview.findOne({ roomId })
+          .populate('interviewerId', 'id firstName lastName email')
+          .populate('candidateId', 'id firstName lastName email')
+          .populate('jobId', 'id title company description')
+          .populate('applicationId', 'id status');
+
         if (interview && interview.status === 'ongoing') {
-          await interview.update({
-            callEndedAt: new Date(),
-            status: 'completed',
-            remarks: generateRemarks(
-              'completed',
-              `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
-              `${interview.candidate.firstName} ${interview.candidate.lastName}`,
-              interview.job.title
-            ),
-          });
+          const jobTitle = interview.jobId.title || interview.jobId;
+          const interviewerName = interview.interviewerId.firstName 
+            ? `${interview.interviewerId.firstName} ${interview.interviewerId.lastName}`
+            : 'Interviewer';
+          const candidateName = interview.candidateId.firstName
+            ? `${interview.candidateId.firstName} ${interview.candidateId.lastName}`
+            : 'Candidate';
+
+          await Interview.findByIdAndUpdate(
+            interview._id,
+            {
+              callEndedAt: new Date(),
+              status: 'completed',
+              remarks: generateRemarks(
+                'completed',
+                interviewerName,
+                candidateName,
+                jobTitle
+              ),
+            },
+            { new: true }
+          );
           console.log(
             `⚠️ Interview in room ${roomId} marked as completed due to interviewer disconnect`
               .yellow.bold
@@ -680,42 +678,35 @@ const setupVideoCallSocket = (io) => {
 
           if (room.size === 0) {
             try {
-              const interview = await Interview.findOne({
-                where: { roomId },
-                include: [
-                  {
-                    model: User,
-                    as: 'interviewer',
-                    attributes: ['id', 'firstName', 'lastName', 'email'],
-                  },
-                  {
-                    model: User,
-                    as: 'candidate',
-                    attributes: ['id', 'firstName', 'lastName', 'email'],
-                  },
-                  {
-                    model: Job,
-                    as: 'job',
-                    attributes: ['id', 'title', 'company', 'description'],
-                  },
-                  {
-                    model: Application,
-                    as: 'application',
-                    attributes: ['id', 'status'],
-                  },
-                ],
-              });
+              const interview = await Interview.findOne({ roomId })
+                .populate('interviewerId', 'id firstName lastName email')
+                .populate('candidateId', 'id firstName lastName email')
+                .populate('jobId', 'id title company description')
+                .populate('applicationId', 'id status');
+
               if (interview && interview.status === 'ongoing' && !isCallEnded) {
-                await interview.update({
-                  callEndedAt: new Date(),
-                  status: 'completed',
-                  remarks: generateRemarks(
-                    'completed',
-                    `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
-                    `${interview.candidate.firstName} ${interview.candidate.lastName}`,
-                    interview.job.title
-                  ),
-                });
+                const jobTitle = interview.jobId.title || interview.jobId;
+                const interviewerName = interview.interviewerId.firstName 
+                  ? `${interview.interviewerId.firstName} ${interview.interviewerId.lastName}`
+                  : 'Interviewer';
+                const candidateName = interview.candidateId.firstName
+                  ? `${interview.candidateId.firstName} ${interview.candidateId.lastName}`
+                  : 'Candidate';
+
+                await Interview.findByIdAndUpdate(
+                  interview._id,
+                  {
+                    callEndedAt: new Date(),
+                    status: 'completed',
+                    remarks: generateRemarks(
+                      'completed',
+                      interviewerName,
+                      candidateName,
+                      jobTitle
+                    ),
+                  },
+                  { new: true }
+                );
                 console.log(
                   `✅ Interview in room ${roomId} marked as completed (all participants left)`
                     .cyan.bold

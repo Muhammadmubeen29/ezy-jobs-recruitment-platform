@@ -417,15 +417,15 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
 
     // If the AI returned no shortlisted candidates, do NOT mass-reject.
     // This avoids accidental mass rejections when the AI returns an empty list.
+    let rejectedAppIds = [];
     if (shortlistedAppIds.length === 0) {
       console.warn(
         'AI returned zero shortlisted candidates — skipping automatic rejection to avoid mass-reject.'
       );
+      // Do not change any application statuses in this case.
     } else {
       // Find rejected application IDs (all applications minus shortlisted ones)
-      const rejectedAppIds = allAppIds.filter(
-        (id) => !shortlistedAppIds.includes(id)
-      );
+      rejectedAppIds = allAppIds.filter((id) => !shortlistedAppIds.includes(id));
 
       // Update shortlisted applications status (Mongoose)
       if (shortlistedAppIds.length > 0) {

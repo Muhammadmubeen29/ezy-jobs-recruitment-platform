@@ -16,12 +16,13 @@ const InputField = ({
   min,
   max,
   step,
+  placeholder = '',
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
-  const sharedClasses = `w-full p-4 bg-light-background dark:bg-dark-background border rounded-lg text-light-text dark:text-dark-text focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:outline-none transition-all duration-300 peer ${
+  const sharedClasses = `w-full p-4 bg-light-background dark:bg-dark-background border rounded-lg text-light-text dark:text-dark-text focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:outline-none transition-all duration-300 ${
     validationMessage
-      ? 'border-red-500'
+      ? 'border-red-500 focus:ring-red-500 dark:border-red-500'
       : 'border-light-border dark:border-dark-border'
   }`;
 
@@ -43,18 +44,12 @@ const InputField = ({
             value={value}
             onChange={onChange}
             onKeyDown={onKeyDown}
-            placeholder=""
+            placeholder={placeholder}
             className={sharedClasses}
             required
             aria-invalid={validationMessage ? 'true' : 'false'}
             aria-describedby={validationMessage ? `${id}-error` : undefined}
           />
-          <label
-            htmlFor={id}
-            className="absolute left-4 top-4 text-light-text dark:text-dark-text text-sm transition-all duration-300 transform -translate-y-1/2 scale-75 origin-top-left peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-focus:top-4 peer-focus:text-normal peer-focus:text-light-primary dark:peer-focus:text-dark-primary"
-          >
-            {label}
-          </label>
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-light-text dark:text-dark-text"
@@ -66,7 +61,10 @@ const InputField = ({
         </div>
 
         {validationMessage && (
-          <p id={`${id}-error`} className="absolute mt-1 text-red-500 text-sm">
+          <p
+            id={`${id}-error`}
+            className="mt-1 text-sm text-red-600 dark:text-red-400"
+          >
             {validationMessage}
           </p>
         )}
@@ -82,7 +80,7 @@ const InputField = ({
             id={id}
             value={value}
             onChange={onChange}
-            placeholder=""
+            placeholder={placeholder}
             rows={rows || 4}
             className={sharedClasses}
             required
@@ -192,7 +190,7 @@ const InputField = ({
             min={min}
             max={max}
             step={step}
-            placeholder=""
+            placeholder={placeholder}
             className={sharedClasses}
             required
             aria-invalid={validationMessage ? 'true' : 'false'}
@@ -206,20 +204,23 @@ const InputField = ({
     <div className="relative w-full mb-6">
       {type !== 'checkbox' && type !== 'radio' ? (
         <>
-          {renderInput()}
           <label
             htmlFor={id}
-            className="absolute left-4 top-4 text-light-text dark:text-dark-text text-sm transition-all duration-300 transform -translate-y-1/2 scale-75 origin-top-left peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-focus:top-4 peer-focus:text-normal peer-focus:text-light-primary dark:peer-focus:text-dark-primary"
+            className="mb-1 block text-sm font-medium text-light-text dark:text-dark-text"
           >
             {label}
           </label>
+          {renderInput()}
         </>
       ) : (
         renderInput()
       )}
 
       {validationMessage && (
-        <p id={`${id}-error`} className="absolute mt-1 text-red-500 text-sm">
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-sm text-red-600 dark:text-red-400"
+        >
           {validationMessage}
         </p>
       )}

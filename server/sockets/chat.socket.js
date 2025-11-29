@@ -1,5 +1,5 @@
 const colors = require('colors');
-// Removed Sequelize import - using Mongoose now
+const mongoose = require('mongoose');
 
 const { ChatRoom, Message, User, Contract } = require('../models');
 
@@ -45,20 +45,9 @@ const setupChatSocket = (io) => {
       }
 
       try {
-        const chatRoom = await ChatRoom.findByPk(roomId, {
-          include: [
-            {
-              model: User,
-              as: 'interviewer',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: User,
-              as: 'recruiter',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-          ],
-        });
+        const chatRoom = await ChatRoom.findById(roomId)
+          .populate('interviewerId', 'id firstName lastName email')
+          .populate('recruiterId', 'id firstName lastName email');
 
         if (!chatRoom) {
           socket.emit('error', {
@@ -69,10 +58,15 @@ const setupChatSocket = (io) => {
         }
 
         // Ensure user is part of this chat room
-        if (
-          socket.user.id !== chatRoom.recruiterId &&
-          socket.user.id !== chatRoom.interviewerId
-        ) {
+        const recruiterIdStr = chatRoom.recruiterId._id 
+          ? chatRoom.recruiterId._id.toString() 
+          : chatRoom.recruiterId.toString();
+        const interviewerIdStr = chatRoom.interviewerId._id 
+          ? chatRoom.interviewerId._id.toString() 
+          : chatRoom.interviewerId.toString();
+        const userIdStr = socket.user.id.toString();
+
+        if (userIdStr !== recruiterIdStr && userIdStr !== interviewerIdStr) {
           socket.emit('error', {
             success: false,
             message: 'You are not authorized to join this chat room',
@@ -104,17 +98,13 @@ const setupChatSocket = (io) => {
         // Mark all unread messages as read for this user
         if (socket.user.isRecruiter || socket.user.isInterviewer) {
           try {
-            await Message.update(
-              { isRead: true },
+            await Message.updateMany(
               {
-                where: {
-                  chatRoomId: roomId,
-                  senderId: {
-                    [Op.ne]: socket.user.id,
-                  },
-                  isRead: false,
-                },
-              }
+                chatRoomId: new mongoose.Types.ObjectId(roomId),
+                senderId: { $ne: new mongoose.Types.ObjectId(socket.user.id) },
+                isRead: false,
+              },
+              { $set: { isRead: true } }
             );
             console.log(
               `✅ Marked messages as read for user ${socket.user.id} in room ${roomId}`
@@ -189,7 +179,7 @@ const setupChatSocket = (io) => {
       }
 
       try {
-        const chatRoom = await ChatRoom.findByPk(roomId);
+        const chatRoom = await ChatRoom.findById(roomId);
 
         if (!chatRoom) {
           socket.emit('error', {
@@ -200,8 +190,16 @@ const setupChatSocket = (io) => {
         }
 
         // Determine user roles based on chat room
-        const isRecruiter = socket.user.id === chatRoom.recruiterId;
-        const isInterviewer = socket.user.id === chatRoom.interviewerId;
+        const recruiterIdStr = chatRoom.recruiterId._id 
+          ? chatRoom.recruiterId._id.toString() 
+          : chatRoom.recruiterId.toString();
+        const interviewerIdStr = chatRoom.interviewerId._id 
+          ? chatRoom.interviewerId._id.toString() 
+          : chatRoom.interviewerId.toString();
+        const userIdStr = socket.user.id.toString();
+
+        const isRecruiter = userIdStr === recruiterIdStr;
+        const isInterviewer = userIdStr === interviewerIdStr;
 
         // Ensure user is part of this chat
         if (!isRecruiter && !isInterviewer) {
@@ -218,26 +216,25 @@ const setupChatSocket = (io) => {
           chatRoomId: roomId,
           senderId: socket.user.id,
           content: content.trim(),
-          recruiterId: chatRoom.recruiterId,
-          interviewerId: chatRoom.interviewerId,
+          recruiterId: chatRoom.recruiterId._id || chatRoom.recruiterId,
+          interviewerId: chatRoom.interviewerId._id || chatRoom.interviewerId,
           isRead: false, // Initially unread for the recipient
+          messageType: 'text',
         });
 
         // Get user info
-        const user = await User.findByPk(socket.user.id, {
-          attributes: ['id', 'firstName', 'lastName', 'email'],
-        });
+        const user = await User.findById(socket.user.id).select('id firstName lastName email');
 
         // Broadcast to room
         chatNamespace.to(roomId).emit('new-message', {
           success: true,
           message: 'New message received',
           data: {
-            id: message.id,
+            id: message._id,
             content: message.content,
             senderId: message.senderId,
             sender: {
-              id: user.id,
+              id: user._id,
               firstName: user.firstName,
               lastName: user.lastName,
               email: user.email,
@@ -271,17 +268,13 @@ const setupChatSocket = (io) => {
     // Mark messages as read
     socket.on('mark-read', async ({ roomId }) => {
       try {
-        await Message.update(
-          { isRead: true },
+        await Message.updateMany(
           {
-            where: {
-              chatRoomId: roomId,
-              senderId: {
-                [Op.ne]: socket.user.id,
-              },
-              isRead: false,
-            },
-          }
+            chatRoomId: new mongoose.Types.ObjectId(roomId),
+            senderId: { $ne: new mongoose.Types.ObjectId(socket.user.id) },
+            isRead: false,
+          },
+          { $set: { isRead: true } }
         );
 
         console.log(
@@ -340,20 +333,9 @@ const setupChatSocket = (io) => {
       }
 
       try {
-        const chatRoom = await ChatRoom.findByPk(roomId, {
-          include: [
-            {
-              model: User,
-              as: 'interviewer',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-            {
-              model: User,
-              as: 'recruiter',
-              attributes: ['id', 'firstName', 'lastName', 'email'],
-            },
-          ],
-        });
+        const chatRoom = await ChatRoom.findById(roomId)
+          .populate('interviewerId', 'id firstName lastName email')
+          .populate('recruiterId', 'id firstName lastName email');
 
         if (!chatRoom) {
           socket.emit('error', {
@@ -364,7 +346,12 @@ const setupChatSocket = (io) => {
         }
 
         // Ensure the user is the recruiter
-        if (socket.user.id !== chatRoom.recruiterId) {
+        const recruiterIdStr = chatRoom.recruiterId._id 
+          ? chatRoom.recruiterId._id.toString() 
+          : chatRoom.recruiterId.toString();
+        const userIdStr = socket.user.id.toString();
+
+        if (userIdStr !== recruiterIdStr) {
           socket.emit('error', {
             success: false,
             message: 'Only recruiters can create contracts',
@@ -374,11 +361,11 @@ const setupChatSocket = (io) => {
 
         // Create the contract
         const contract = await Contract.create({
-          jobId: chatRoom.jobId,
-          interviewerId: chatRoom.interviewerId,
-          recruiterId: chatRoom.recruiterId,
+          jobId: chatRoom.jobId._id || chatRoom.jobId,
+          interviewerId: chatRoom.interviewerId._id || chatRoom.interviewerId,
+          recruiterId: chatRoom.recruiterId._id || chatRoom.recruiterId,
           agreedPrice: parseFloat(agreedPrice),
-          roomId: chatRoom.id,
+          roomId: chatRoom._id,
           status: 'pending',
           paymentStatus: 'pending',
         });
@@ -388,8 +375,8 @@ const setupChatSocket = (io) => {
           chatRoomId: roomId,
           senderId: socket.user.id,
           content: `Contract created with agreed price: $${parseFloat(agreedPrice).toFixed(2)}`,
-          recruiterId: chatRoom.recruiterId,
-          interviewerId: chatRoom.interviewerId,
+          recruiterId: chatRoom.recruiterId._id || chatRoom.recruiterId,
+          interviewerId: chatRoom.interviewerId._id || chatRoom.interviewerId,
           isRead: false,
           messageType: 'contract',
         });
@@ -399,7 +386,7 @@ const setupChatSocket = (io) => {
           success: true,
           message: 'Contract created',
           data: {
-            id: message.id,
+            id: message._id,
             content: message.content,
             senderId: message.senderId,
             sender: {
@@ -414,7 +401,7 @@ const setupChatSocket = (io) => {
             isRead: message.isRead,
             messageType: 'contract',
             contract: {
-              id: contract.id,
+              id: contract._id,
               agreedPrice: contract.agreedPrice,
               status: contract.status,
               paymentStatus: contract.paymentStatus,

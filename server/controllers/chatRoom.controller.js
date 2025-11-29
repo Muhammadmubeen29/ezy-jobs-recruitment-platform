@@ -329,7 +329,7 @@ const getAllMessagesFromChatRoom = asyncHandler(async (req, res) => {
     throw new Error('Please provide a valid chat room ID to load messages.');
   }
 
-  const chatRoom = await ChatRoom.findByPk(chatRoomId);
+  const chatRoom = await ChatRoom.findById(chatRoomId);
 
   if (!chatRoom) {
     res.status(StatusCodes.NOT_FOUND);

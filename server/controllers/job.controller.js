@@ -89,6 +89,23 @@ const createJob = asyncHandler(async (req, res) => {
     );
   }
 
+  // Validate salary range - reject negative numbers
+  const salaryPattern = /(\d+)/g;
+  const salaryNumbers = salaryRange.match(salaryPattern);
+  if (salaryNumbers) {
+    for (const num of salaryNumbers) {
+      const numValue = parseInt(num, 10);
+      if (numValue < 0) {
+        res.status(StatusCodes.BAD_REQUEST);
+        throw new Error('Salary cannot be negative. Please provide a valid salary range.');
+      }
+      if (numValue === 0) {
+        res.status(StatusCodes.BAD_REQUEST);
+        throw new Error('Salary must be greater than 0. Please provide a valid salary range.');
+      }
+    }
+  }
+
   const requirementsArray = convertToArray(requirements);
   const validatedRequirements = validateArray(
     res,
@@ -306,10 +323,35 @@ const getAllJobs = asyncHandler(async (req, res) => {
     salaryRange,
     isClosed,
     limit,
-    recruiterId,
   } = req.query;
+  const user = req.user;
   let query = {};
 
+  // STRICT ROLE-BASED DATA ISOLATION - APPLY FILTERING FIRST, BEFORE ANY OTHER LOGIC
+  // IGNORE ALL recruiterId query params from frontend - always use req.user.id
+  
+  if (user) {
+    // RECRUITERS: STRICT FILTER - ONLY their own jobs, NO EXCEPTIONS
+    if (user.isRecruiter && !user.isAdmin) {
+      // Apply strict filter FIRST - this cannot be overridden
+      query.recruiterId = user.id;
+      // New recruiters with no jobs will get empty array - this is correct
+    }
+    // Candidates see only active jobs
+    else if (user.isCandidate && !user.isRecruiter && !user.isAdmin) {
+      query.isClosed = false;
+    }
+    // Admins can see all jobs (no additional filter)
+    // Other authenticated users see only active jobs
+    else if (!user.isAdmin) {
+      query.isClosed = false;
+    }
+  } else {
+    // Public access: show only active jobs
+    query.isClosed = false;
+  }
+
+  // Apply additional filters AFTER role-based filtering is set
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: 'i' } },
@@ -322,8 +364,16 @@ const getAllJobs = asyncHandler(async (req, res) => {
   if (location) query.location = { $regex: location, $options: 'i' };
   if (company) query.company = { $regex: company, $options: 'i' };
   if (salaryRange) query.salaryRange = { $regex: salaryRange, $options: 'i' };
-  if (isClosed !== undefined) query.isClosed = isClosed === 'true';
-  if (recruiterId) query.recruiterId = recruiterId;
+  // Only allow isClosed filter for admins and recruiters viewing their own jobs
+  if (isClosed !== undefined && (user?.isAdmin || (user?.isRecruiter && !user?.isAdmin))) {
+    query.isClosed = isClosed === 'true';
+  }
+
+  // FINAL ENFORCEMENT: For recruiters, ensure recruiterId is ALWAYS set to user.id
+  // This prevents any possibility of query manipulation
+  if (user?.isRecruiter && !user?.isAdmin) {
+    query.recruiterId = user.id;
+  }
 
   const jobs = await Job.find(query)
     .populate('recruiterId', 'firstName lastName email')
@@ -380,12 +430,47 @@ const getAllJobs = asyncHandler(async (req, res) => {
 
 const getJobById = asyncHandler(async (req, res) => {
   const jobId = req.params.id;
+  const user = req.user;
 
   const job = await Job.findById(jobId).populate('recruiterId', 'firstName lastName email');
 
   if (!job) {
     res.status(StatusCodes.NOT_FOUND);
     throw new Error('This job posting no longer exists or has been removed.');
+  }
+
+  // STRICT OWNERSHIP CHECK - Must be done BEFORE sending response
+  if (user) {
+    // Recruiters can ONLY view their own jobs - STRICT CHECK
+    if (user.isRecruiter && !user.isAdmin) {
+      // Check if job.recruiterId matches user.id
+      const jobRecruiterId = job.recruiterId?._id?.toString() || job.recruiterId?.toString();
+      if (jobRecruiterId !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this job posting.');
+      }
+    }
+    // Candidates can view all active jobs
+    else if (user.isCandidate && !user.isRecruiter && !user.isAdmin) {
+      if (job.isClosed) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('This job posting is no longer available.');
+      }
+    }
+    // Non-recruiter, non-candidate, non-admin users can only view active jobs
+    else if (!user.isAdmin) {
+      if (job.isClosed) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('This job posting is no longer available.');
+      }
+    }
+    // Admins can view all jobs (no restriction)
+  } else {
+    // Public access: only active jobs
+    if (job.isClosed) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('This job posting is no longer available.');
+    }
   }
 
   const requirementsDisplay = Array.isArray(job.requirements) 
@@ -435,6 +520,7 @@ const updateJobById = asyncHandler(async (req, res) => {
     isClosed,
   } = req.body;
   const jobId = req.params.id;
+  const user = req.user;
 
   if (
     !title &&
@@ -458,6 +544,14 @@ const updateJobById = asyncHandler(async (req, res) => {
   if (!job) {
     res.status(StatusCodes.NOT_FOUND);
     throw new Error('Job posting not found. Please check and try again.');
+  }
+
+  // Role-based access control: Recruiters can ONLY update their own jobs
+  if (user.isRecruiter && !user.isAdmin) {
+    if (job.recruiterId._id.toString() !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to update this job posting.');
+    }
   }
 
   let validatedData = {};
@@ -656,12 +750,21 @@ const updateJobById = asyncHandler(async (req, res) => {
 
 const deleteJobById = asyncHandler(async (req, res) => {
   const jobId = req.params.id;
+  const user = req.user;
 
   const job = await Job.findById(jobId).populate('recruiterId', 'firstName lastName email');
 
   if (!job) {
     res.status(StatusCodes.NOT_FOUND);
     throw new Error('Job posting not found. Please check and try again.');
+  }
+
+  // Role-based access control: Recruiters can ONLY delete their own jobs
+  if (user.isRecruiter && !user.isAdmin) {
+    if (job.recruiterId._id.toString() !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to delete this job posting.');
+    }
   }
 
   const deletedJob = await Job.findByIdAndDelete(jobId);

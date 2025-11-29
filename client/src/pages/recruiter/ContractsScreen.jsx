@@ -86,10 +86,11 @@ export default function ContractsScreen() {
     try {
       await completeContract(contract.id).unwrap();
 
+      const jobTitle = contract.job?.title || contract.jobId?.title || 'Unknown Job';
       trackEvent(
         'Contract Completed',
         'Contract Action',
-        `Completed contract for ${contract.job.title}`
+        `Completed contract for ${jobTitle}`
       );
 
       // Refetch data to show updated status
@@ -115,10 +116,11 @@ export default function ContractsScreen() {
     setSelectedContract(contract);
     setShowPaymentModal(true);
 
+    const jobTitle = contract.job?.title || contract.jobId?.title || 'Unknown Job';
     trackEvent(
       'Payment Modal Opened',
       'Contract Action',
-      `Opened payment for contract ${contract.job.title}`
+      `Opened payment for contract ${jobTitle}`
     );
   };
 
@@ -128,10 +130,11 @@ export default function ContractsScreen() {
     setSelectedContract(null);
     refetch(); // Refresh contracts to show updated status
 
+    const jobTitle = selectedContract?.job?.title || selectedContract?.jobId?.title || 'Unknown Job';
     trackEvent(
       'Payment Completed',
       'Contract Action',
-      `Payment completed for contract ${selectedContract?.job?.title}`
+      `Payment completed for contract ${jobTitle}`
     );
   };
 
@@ -176,13 +179,21 @@ export default function ContractsScreen() {
     {
       key: 'jobTitle',
       label: 'Job Title',
-      render: (contract) => contract.job.title,
+      render: (contract) => {
+        // Handle both jobId (populated) and job (if transformed)
+        const job = contract.job || contract.jobId;
+        return job?.title || 'Job Not Found';
+      },
     },
     {
       key: 'interviewer',
       label: 'Interviewer',
-      render: (contract) =>
-        `${contract.interviewer.firstName} ${contract.interviewer.lastName}`,
+      render: (contract) => {
+        const interviewer = contract.interviewer || contract.interviewerId;
+        return interviewer 
+          ? `${interviewer.firstName} ${interviewer.lastName}`
+          : 'Interviewer Not Found';
+      },
     },
     {
       key: 'paymentReady',

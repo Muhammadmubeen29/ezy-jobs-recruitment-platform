@@ -265,13 +265,13 @@ export default function AIManagementScreen() {
                   id="refreshInterval"
                   type="select"
                   label=""
-                  value={refreshInterval}
+                  value={String(refreshInterval)}
                   onChange={(e) => setRefreshInterval(Number(e.target.value))}
                   options={[
-                    { value: 10000, label: 'Auto-refresh: 10s' },
-                    { value: 30000, label: 'Auto-refresh: 30s' },
-                    { value: 60000, label: 'Auto-refresh: 1m' },
-                    { value: 0, label: 'Manual only' },
+                    { value: '10000', label: 'Auto-refresh: 10s' },
+                    { value: '30000', label: 'Auto-refresh: 30s' },
+                    { value: '60000', label: 'Auto-refresh: 1m' },
+                    { value: '0', label: 'Manual only' },
                   ]}
                 />
               </div>

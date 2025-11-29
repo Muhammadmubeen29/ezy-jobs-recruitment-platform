@@ -126,19 +126,31 @@ export default function ContractsScreen() {
     {
       key: 'jobTitle',
       label: 'Job Title',
-      render: (contract) => contract.job.title,
+      render: (contract) => {
+        // Handle both jobId (populated) and job (if transformed)
+        const job = contract.job || contract.jobId;
+        return job?.title || 'Job Not Found';
+      },
     },
     {
       key: 'recruiter',
       label: 'Recruiter',
-      render: (contract) =>
-        `${contract.recruiter.firstName} ${contract.recruiter.lastName}`,
+      render: (contract) => {
+        const recruiter = contract.recruiter || contract.recruiterId;
+        return recruiter
+          ? `${recruiter.firstName} ${recruiter.lastName}`
+          : 'Recruiter Not Found';
+      },
     },
     {
       key: 'interviewer',
       label: 'Interviewer',
-      render: (contract) =>
-        `${contract.interviewer.firstName} ${contract.interviewer.lastName}`,
+      render: (contract) => {
+        const interviewer = contract.interviewer || contract.interviewerId;
+        return interviewer
+          ? `${interviewer.firstName} ${interviewer.lastName}`
+          : 'Interviewer Not Found';
+      },
     },
     {
       key: 'agreedPrice',

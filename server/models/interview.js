@@ -14,9 +14,14 @@ const interviewSchema = new mongoose.Schema({
     required: [true, 'Scheduled time is required'],
     validate: {
       validator: function(value) {
-        return value > new Date();
+        // Only validate future dates when creating a new scheduled interview
+        // Allow any date for completed/cancelled interviews or updates
+        if (this.isNew && this.status === 'scheduled') {
+          return value > new Date();
+        }
+        return true;
       },
-      message: 'Scheduled time must be in the future',
+      message: 'Scheduled time must be in the future when creating a new scheduled interview',
     },
   },
   callStartedAt: {

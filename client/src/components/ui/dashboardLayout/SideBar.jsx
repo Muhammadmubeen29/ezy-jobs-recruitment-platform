@@ -74,19 +74,31 @@ const SideBar = ({ navItems = [] }) => {
                         })
                       );
                     }}
-                    className={`flex items-center rounded-lg p-2 transition-all duration-200 ${
+                    className={`group flex items-center rounded-lg p-2.5 transition-all duration-300 ease-in-out ${
                       isActive
-                        ? 'bg-light-primary text-white dark:bg-dark-primary'
-                        : 'text-light-text hover:bg-light-surface dark:text-dark-text dark:hover:bg-dark-surface'
+                        ? 'bg-light-primary text-white shadow-lg shadow-light-primary/30 dark:bg-dark-primary dark:shadow-dark-primary/30'
+                        : 'text-light-text hover:bg-light-surface hover:translate-x-1 hover:shadow-md hover:shadow-light-border/20 dark:text-dark-text dark:hover:bg-dark-surface dark:hover:shadow-dark-border/20'
                     } ${collapsed ? 'justify-center' : ''}`}
                   >
                     <span
-                      className={`${isActive ? '' : 'text-light-text/70 dark:text-dark-text/70'} text-lg`}
+                      className={`text-lg transition-all duration-300 ${
+                        isActive
+                          ? 'text-white'
+                          : 'text-light-text/70 group-hover:text-light-primary group-hover:scale-110 dark:text-dark-text/70 dark:group-hover:text-dark-primary'
+                      }`}
                     >
                       {item.icon}
                     </span>
                     {!collapsed && (
-                      <span className="ml-3 text-base">{item.label}</span>
+                      <span
+                        className={`ml-3 text-base font-medium transition-all duration-300 ${
+                          isActive
+                            ? 'text-white'
+                            : 'text-light-text group-hover:text-light-primary group-hover:font-semibold dark:text-dark-text dark:group-hover:text-dark-primary'
+                        }`}
+                      >
+                        {item.label}
+                      </span>
                     )}
                   </Link>
                 </li>
@@ -99,15 +111,15 @@ const SideBar = ({ navItems = [] }) => {
           <div className="border-t border-light-border p-3 dark:border-dark-border">
             <button
               onClick={toggleCollapse}
-              className={`flex w-full items-center rounded-lg p-2 text-light-text transition-colors duration-200 hover:bg-light-surface dark:text-dark-text dark:hover:bg-dark-surface ${collapsed ? 'justify-center' : ''}`}
+              className={`group flex w-full items-center rounded-lg p-2.5 text-light-text transition-all duration-300 ease-in-out hover:bg-light-surface hover:translate-x-1 hover:shadow-md hover:shadow-light-border/20 dark:text-dark-text dark:hover:bg-dark-surface dark:hover:shadow-dark-border/20 ${collapsed ? 'justify-center' : ''}`}
             >
               {collapsed ? (
-                <FaChevronRight className="text-lg" />
+                <FaChevronRight className="text-lg transition-all duration-300 group-hover:text-light-primary group-hover:scale-110 dark:group-hover:text-dark-primary" />
               ) : (
-                <FaChevronLeft className="text-lg" />
+                <FaChevronLeft className="text-lg transition-all duration-300 group-hover:text-light-primary group-hover:scale-110 dark:group-hover:text-dark-primary" />
               )}
               {!collapsed && (
-                <span className="ml-3 text-base">
+                <span className="ml-3 text-base font-medium transition-all duration-300 group-hover:text-light-primary group-hover:font-semibold dark:group-hover:text-dark-primary">
                   {collapsed ? 'Expand' : 'Collapse'}
                 </span>
               )}

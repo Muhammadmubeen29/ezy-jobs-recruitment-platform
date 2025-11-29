@@ -99,17 +99,17 @@ export default function DashboardScreen() {
     data: jobs,
     isLoading: loadingJobs,
     error: errorJobs,
-  } = useGetAllJobsQuery({
-    recruiterId,
-  });
+  } = useGetAllJobsQuery({});
+  // Backend automatically filters by recruiterId for recruiters
 
   const {
     data: applications,
     isLoading: loadingApplications,
     error: errorApplications,
   } = useGetAllApplicationsQuery({
-    recruiterId,
+    role: 'recruiter',
   });
+  // Backend automatically filters by recruiter's jobs
 
   const {
     data: interviews,

@@ -19,11 +19,23 @@ import { useLocation } from 'react-router-dom';
 
 import Alert from '../../components/Alert';
 import Loader from '../../components/Loader';
+import LocationAutoComplete from '../../components/LocationAutoComplete';
 import Modal from '../../components/Modal';
 import Table from '../../components/ui/dashboardLayout/Table';
 import InputField from '../../components/ui/mainLayout/InputField';
 
 import { trackEvent, trackPageView } from '../../utils/analytics';
+import {
+  validateTitle,
+  validateDescription,
+  validateCompany,
+  validateRequirements,
+  validateBenefits,
+  validateSalaryRange,
+  validateCategory,
+  validateLocation,
+  validateAllFields,
+} from '../../utils/jobValidation';
 
 import {
   useCheckAiServiceStatusQuery,
@@ -48,7 +60,22 @@ export default function JobsScreen() {
   const [salaryRange, setSalaryRange] = useState('');
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
   const [isClosed, setIsClosed] = useState(false);
+  const [locationError, setLocationError] = useState('');
+
+  // Validation errors state
+  const [errors, setErrors] = useState({
+    title: '',
+    description: '',
+    company: '',
+    requirements: '',
+    benefits: '',
+    salaryRange: '',
+    category: '',
+    customCategory: '',
+    location: '',
+  });
 
   const routeLocation = useLocation();
 
@@ -57,9 +84,8 @@ export default function JobsScreen() {
     isLoading: isJobsLoading,
     error,
     refetch,
-  } = useGetAllJobsQuery({
-    recruiterId: useSelector((state) => state.auth.userInfo?.id),
-  });
+  } = useGetAllJobsQuery({});
+  // Backend automatically filters by recruiterId for recruiters
 
   const {
     data: aiServiceStatus,
@@ -102,6 +128,8 @@ export default function JobsScreen() {
     trackPageView(routeLocation.pathname);
   }, [routeLocation.pathname]);
 
+  const PRESET_CATEGORIES = ['IT', 'Engineering', 'Sales', 'Marketing', 'Finance'];
+
   useEffect(() => {
     if (selectedJob) {
       setTitle(selectedJob.title || '');
@@ -110,9 +138,30 @@ export default function JobsScreen() {
       setRequirements(selectedJob.requirements || '');
       setBenefits(selectedJob.benefits || '');
       setSalaryRange(selectedJob.salaryRange || '');
-      setCategory(selectedJob.category || '');
+
+      // If the saved category isn't one of our presets, treat it as a custom category
+      if (selectedJob.category && !PRESET_CATEGORIES.includes(selectedJob.category)) {
+        setCategory('Other');
+        setCustomCategory(selectedJob.category);
+      } else {
+        setCategory(selectedJob.category || '');
+        setCustomCategory('');
+      }
+
       setLocation(selectedJob.location || '');
       setIsClosed(selectedJob.isClosed || false);
+      setLocationError('');
+      setErrors({
+        title: '',
+        description: '',
+        company: '',
+        requirements: '',
+        benefits: '',
+        salaryRange: '',
+        category: '',
+        customCategory: '',
+        location: '',
+      });
     }
   }, [selectedJob]);
 
@@ -133,7 +182,20 @@ export default function JobsScreen() {
     setSalaryRange('');
     setCategory('');
     setLocation('');
+    setCustomCategory('');
+    setLocationError('');
     setIsClosed(false);
+    setErrors({
+      title: '',
+      description: '',
+      company: '',
+      requirements: '',
+      benefits: '',
+      salaryRange: '',
+      category: '',
+      customCategory: '',
+      location: '',
+    });
     trackEvent(
       'Create Job',
       'User Action',
@@ -141,7 +203,123 @@ export default function JobsScreen() {
     );
   };
 
+  const handleLocationChange = (selectedLocation) => {
+    setLocation(selectedLocation);
+    const error = validateLocation(selectedLocation);
+    setErrors((prev) => ({ ...prev, location: error }));
+    setLocationError(error);
+  };
+
+  const handleLocationValidationChange = (error) => {
+    setLocationError(error);
+    setErrors((prev) => ({ ...prev, location: error }));
+  };
+
+  const handleTitleChange = (e) => {
+    const value = e.target.value;
+    setTitle(value);
+    const error = validateTitle(value);
+    setErrors((prev) => ({ ...prev, title: error }));
+  };
+
+  const handleDescriptionChange = (e) => {
+    const value = e.target.value;
+    setDescription(value);
+    const error = validateDescription(value);
+    setErrors((prev) => ({ ...prev, description: error }));
+  };
+
+  const handleCompanyChange = (e) => {
+    const value = e.target.value;
+    setCompany(value);
+    const error = validateCompany(value);
+    setErrors((prev) => ({ ...prev, company: error }));
+  };
+
+  const handleRequirementsChange = (e) => {
+    const value = e.target.value;
+    setRequirements(value);
+    const error = validateRequirements(value);
+    setErrors((prev) => ({ ...prev, requirements: error }));
+  };
+
+  const handleBenefitsChange = (e) => {
+    const value = e.target.value;
+    setBenefits(value);
+    const error = validateBenefits(value);
+    setErrors((prev) => ({ ...prev, benefits: error }));
+  };
+
+  const handleSalaryRangeChange = (e) => {
+    const value = e.target.value;
+    
+    // Real-time validation: reject negative numbers immediately
+    const salaryPattern = /(\d+)/g;
+    const numbers = value.match(salaryPattern);
+    let error = '';
+    
+    if (numbers) {
+      for (const num of numbers) {
+        const numValue = parseInt(num, 10);
+        if (numValue < 0) {
+          error = 'Salary cannot be negative.';
+          break;
+        }
+        if (numValue === 0 && value.trim() !== '') {
+          error = 'Salary must be greater than 0.';
+          break;
+        }
+      }
+    }
+    
+    // If no negative found, run full validation
+    if (!error) {
+      error = validateSalaryRange(value);
+    }
+    
+    setSalaryRange(value);
+    setErrors((prev) => ({ ...prev, salaryRange: error }));
+  };
+
+  const handleCategoryChange = (val) => {
+    setCategory(val);
+    if (val !== 'Other') {
+      setCustomCategory('');
+      setErrors((prev) => ({ ...prev, category: '', customCategory: '' }));
+    } else {
+      const error = validateCategory(val, customCategory);
+      setErrors((prev) => ({ ...prev, category: error }));
+    }
+  };
+
+  const handleCustomCategoryChange = (e) => {
+    const value = e.target.value;
+    setCustomCategory(value);
+    const error = validateCategory(category, value);
+    setErrors((prev) => ({ ...prev, customCategory: error, category: error }));
+  };
+
   const createNewJob = async () => {
+    const finalCategory = category === 'Other' ? (customCategory || 'Other') : category;
+    const { errors: validationErrors, isValid } = validateAllFields({
+      title,
+      description,
+      company,
+      requirements,
+      benefits,
+      salaryRange,
+      category: finalCategory,
+      customCategory,
+      location,
+    });
+
+    setErrors(validationErrors);
+    setLocationError(validationErrors.location);
+
+    if (!isValid) {
+      return;
+    }
+
     try {
       await createJob({
         title,
@@ -150,7 +328,7 @@ export default function JobsScreen() {
         requirements,
         benefits,
         salaryRange,
-        category,
+        category: finalCategory,
         location,
         isClosed,
       }).unwrap();
@@ -169,6 +347,26 @@ export default function JobsScreen() {
   };
 
   const saveJobChanges = async () => {
+    const finalCategory = category === 'Other' ? (customCategory || 'Other') : category;
+    const { errors: validationErrors, isValid } = validateAllFields({
+      title,
+      description,
+      company,
+      requirements,
+      benefits,
+      salaryRange,
+      category: finalCategory,
+      customCategory,
+      location,
+    });
+
+    setErrors(validationErrors);
+    setLocationError(validationErrors.location);
+
+    if (!isValid) {
+      return;
+    }
+
     try {
       await updateJob({
         id: selectedJob.id,
@@ -179,7 +377,7 @@ export default function JobsScreen() {
           requirements,
           benefits,
           salaryRange,
-          category,
+          category: finalCategory,
           location,
           isClosed,
         },
@@ -339,14 +537,14 @@ export default function JobsScreen() {
   return (
     <>
       <Helmet>
-        <title>Manage Jobs - OptaHire | Post & Track Job Openings</title>
+        <title>Manage Jobs - EzyJobs | Post & Track Job Openings</title>
         <meta
           name="description"
-          content="Manage your job postings on OptaHire. Create compelling job descriptions and attract top talent with AI-powered visibility."
+          content="Manage your job postings on EzyJobs. Create compelling job descriptions and attract top talent with AI-powered visibility."
         />
         <meta
           name="keywords"
-          content="OptaHire Manage Jobs, Job Postings, Recruiter Jobs, Hiring Positions, Job Creation"
+          content="EzyJobs Manage Jobs, Job Postings, Recruiter Jobs, Hiring Positions, Job Creation"
         />
       </Helmet>
 
@@ -495,35 +693,40 @@ export default function JobsScreen() {
               type="text"
               label="Job Title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
+              validationMessage={errors.title}
             />
             <InputField
               id="company"
               type="text"
               label="Company"
               value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              onChange={handleCompanyChange}
+              validationMessage={errors.company}
             />
             <InputField
               id="description"
               type="textarea"
               label="Description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={handleDescriptionChange}
+              validationMessage={errors.description}
             />
             <InputField
               id="requirements"
               type="textarea"
               label="Requirements"
               value={requirements}
-              onChange={(e) => setRequirements(e.target.value)}
+              onChange={handleRequirementsChange}
+              validationMessage={errors.requirements}
             />
             <InputField
               id="benefits"
               type="textarea"
               label="Benefits"
               value={benefits}
-              onChange={(e) => setBenefits(e.target.value)}
+              onChange={handleBenefitsChange}
+              validationMessage={errors.benefits}
             />
             <InputField
               id="salaryRange"
@@ -531,14 +734,16 @@ export default function JobsScreen() {
               label="Salary Range"
               placeholder="$30k - $50k"
               value={salaryRange}
-              onChange={(e) => setSalaryRange(e.target.value)}
+              onChange={handleSalaryRangeChange}
+              validationMessage={errors.salaryRange}
             />
             <InputField
               id="category"
               type="select"
               label="Category"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              validationMessage={errors.category}
               options={[
                 { value: 'IT', label: 'IT' },
                 { value: 'Engineering', label: 'Engineering' },
@@ -548,17 +753,27 @@ export default function JobsScreen() {
                 { value: 'Other', label: 'Other' },
               ]}
             />
-            <InputField
-              id="location"
-              type="text"
-              label="Location"
+            {category === 'Other' && (
+              <InputField
+                id="customCategory"
+                type="text"
+                label="Specify Category"
+                placeholder="e.g. Customer Success"
+                value={customCategory}
+                onChange={handleCustomCategoryChange}
+                validationMessage={errors.customCategory}
+              />
+            )}
+            <LocationAutoComplete
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={handleLocationChange}
+              onValidationChange={handleLocationValidationChange}
+              placeholder="Start typing a city (e.g., Karachi)"
             />
             <div className="flex justify-end space-x-2 pt-4">
               <button
                 className="flex items-center gap-2 rounded bg-gray-300 px-4 py-2 text-gray-800 transition-all duration-200 hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
-                onClick={() => setShowEditModal(false)}
+                onClick={() => setShowCreateModal(false)}
                 disabled={isUpdating}
               >
                 <FaTimes />
@@ -592,54 +807,61 @@ export default function JobsScreen() {
               <Alert message="Warning: The AI service is not ready. Closing a job now will not automatically shortlist candidates." />
             )}
             <InputField
-              id="title"
+              id="title-edit"
               type="text"
               label="Job Title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
+              validationMessage={errors.title}
             />
             <InputField
-              id="company"
+              id="company-edit"
               type="text"
               label="Company"
               value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              onChange={handleCompanyChange}
+              validationMessage={errors.company}
             />
             <InputField
-              id="description"
+              id="description-edit"
               type="textarea"
               label="Description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={handleDescriptionChange}
+              validationMessage={errors.description}
             />
             <InputField
-              id="requirements"
+              id="requirements-edit"
               type="textarea"
               label="Requirements"
               value={requirements}
-              onChange={(e) => setRequirements(e.target.value)}
+              onChange={handleRequirementsChange}
+              validationMessage={errors.requirements}
             />
             <InputField
-              id="benefits"
+              id="benefits-edit"
               type="textarea"
               label="Benefits"
               value={benefits}
-              onChange={(e) => setBenefits(e.target.value)}
+              onChange={handleBenefitsChange}
+              validationMessage={errors.benefits}
             />
             <InputField
-              id="salaryRange"
+              id="salaryRange-edit"
               type="text"
               label="Salary Range"
               placeholder="$30k - $50k"
               value={salaryRange}
-              onChange={(e) => setSalaryRange(e.target.value)}
+              onChange={handleSalaryRangeChange}
+              validationMessage={errors.salaryRange}
             />
             <InputField
-              id="category"
+              id="category-edit"
               type="select"
               label="Category"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              validationMessage={errors.category}
               options={[
                 { value: 'IT', label: 'IT' },
                 { value: 'Engineering', label: 'Engineering' },
@@ -649,12 +871,23 @@ export default function JobsScreen() {
                 { value: 'Other', label: 'Other' },
               ]}
             />
-            <InputField
-              id="location"
-              type="text"
-              label="Location"
+            {category === 'Other' && (
+              <InputField
+                id="customCategoryEdit"
+                type="text"
+                label="Specify Category"
+                placeholder="e.g. Customer Success"
+                value={customCategory}
+                onChange={handleCustomCategoryChange}
+                validationMessage={errors.customCategory}
+              />
+            )}
+            <LocationAutoComplete
+              id="job-location-edit"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={handleLocationChange}
+              onValidationChange={handleLocationValidationChange}
+              placeholder="Start typing a city (e.g., Lahore)"
             />
             <InputField
               id="isClosed"

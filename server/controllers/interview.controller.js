@@ -198,7 +198,32 @@ const createInterview = asyncHandler(async (req, res) => {
 
 const getAllInterviews = asyncHandler(async (req, res) => {
   const { status, scheduledTime, interviewerId, candidateId, jobId } = req.query;
+  const user = req.user;
   let query = {};
+
+  // Role-based data isolation
+  if (user) {
+    // Interviewers can ONLY see interviews assigned to them
+    if (user.isInterviewer && !user.isAdmin) {
+      query.interviewerId = user.id;
+    }
+    // Candidates can see their own interviews
+    else if (user.isCandidate && !user.isInterviewer && !user.isRecruiter && !user.isAdmin) {
+      query.candidateId = user.id;
+    }
+    // Recruiters can see interviews for their jobs
+    else if (user.isRecruiter && !user.isAdmin) {
+      const recruiterJobs = await Job.find({ recruiterId: user.id }).select('_id');
+      const recruiterJobIds = recruiterJobs.map(job => job._id.toString());
+      if (recruiterJobIds.length > 0) {
+        query.jobId = { $in: recruiterJobIds };
+      } else {
+        // No jobs = no interviews
+        query.jobId = { $in: [] };
+      }
+    }
+    // Admins can see all interviews (no filter)
+  }
 
   if (status) {
     query.status = status;
@@ -208,16 +233,36 @@ const getAllInterviews = asyncHandler(async (req, res) => {
     query.scheduledTime = { $gte: new Date(scheduledTime) };
   }
 
-  if (interviewerId) {
+  // Override interviewerId filter if user is interviewer (already set above)
+  // Only allow manual interviewerId filter for admins
+  if (interviewerId && user?.isAdmin) {
     query.interviewerId = interviewerId;
   }
 
+  // Allow candidateId filter for admins or if user is the candidate
   if (candidateId) {
-    query.candidateId = candidateId;
+    if (user?.isAdmin || (user?.isCandidate && candidateId === user.id.toString())) {
+      query.candidateId = candidateId;
+    }
   }
 
+  // Allow jobId filter for admins or recruiters (if job belongs to them)
   if (jobId) {
-    query.jobId = jobId;
+    if (user?.isAdmin) {
+      query.jobId = jobId;
+    } else if (user?.isRecruiter && !user?.isAdmin) {
+      // Verify the job belongs to the recruiter
+      const job = await Job.findById(jobId);
+      if (job && job.recruiterId.toString() === user.id.toString()) {
+        query.jobId = jobId;
+      } else {
+        // Job doesn't belong to recruiter, return empty
+        query.jobId = { $in: [] };
+      }
+    } else if (!query.jobId) {
+      // For other roles, only if jobId wasn't already set by role-based filter
+      query.jobId = jobId;
+    }
   }
 
   const interviews = await Interview.find(query)
@@ -271,8 +316,47 @@ const getAllInterviews = asyncHandler(async (req, res) => {
 
 const getInterviewsByJobId = asyncHandler(async (req, res) => {
   const { jobId } = req.params;
+  const user = req.user;
 
-  const interviews = await Interview.find({ jobId })
+  // Verify job exists and check access
+  const job = await Job.findById(jobId);
+  if (!job) {
+    res.status(StatusCodes.NOT_FOUND);
+    throw new Error('Job not found.');
+  }
+
+  // Role-based access control
+  if (user) {
+    // Recruiters can only see interviews for their own jobs
+    if (user.isRecruiter && !user.isAdmin) {
+      if (job.recruiterId.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access interviews for this job.');
+      }
+    }
+    // Interviewers can only see interviews assigned to them
+    else if (user.isInterviewer && !user.isAdmin) {
+      // Filter will be applied in the query below
+    }
+    // Candidates can see their own interviews
+    else if (user.isCandidate && !user.isInterviewer && !user.isRecruiter && !user.isAdmin) {
+      // Filter will be applied in the query below
+    }
+    // Admins can see all interviews (no restriction)
+  }
+
+  let query = { jobId };
+  
+  // Apply role-based filtering
+  if (user) {
+    if (user.isInterviewer && !user.isAdmin) {
+      query.interviewerId = user.id;
+    } else if (user.isCandidate && !user.isInterviewer && !user.isRecruiter && !user.isAdmin) {
+      query.candidateId = user.id;
+    }
+  }
+
+  const interviews = await Interview.find(query)
     .populate('interviewerId', 'firstName lastName email')
     .populate('candidateId', 'firstName lastName email')
     .populate('jobId', 'title company')
@@ -321,6 +405,7 @@ const getInterviewsByJobId = asyncHandler(async (req, res) => {
  */
 
 const getInterviewById = asyncHandler(async (req, res) => {
+  const user = req.user;
   const interview = await Interview.findById(req.params.id)
     .populate('interviewerId', 'firstName lastName email')
     .populate('candidateId', 'firstName lastName email')
@@ -330,6 +415,36 @@ const getInterviewById = asyncHandler(async (req, res) => {
   if (!interview) {
     res.status(StatusCodes.NOT_FOUND);
     throw new Error('Interview not found.');
+  }
+
+  // Role-based access control
+  if (user) {
+    // Interviewers can ONLY see interviews assigned to them
+    if (user.isInterviewer && !user.isAdmin) {
+      if (interview.interviewerId._id.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this interview.');
+      }
+    }
+    // Candidates can see their own interviews
+    else if (user.isCandidate && !user.isInterviewer && !user.isRecruiter && !user.isAdmin) {
+      if (interview.candidateId._id.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this interview.');
+      }
+    }
+    // Recruiters can see interviews for their jobs
+    else if (user.isRecruiter && !user.isAdmin) {
+      const job = await Job.findById(interview.jobId._id || interview.jobId);
+      if (!job || job.recruiterId.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this interview.');
+      }
+    }
+    // Admins can see all interviews (no restriction)
+  } else {
+    res.status(StatusCodes.UNAUTHORIZED);
+    throw new Error('Authentication required to access interview details.');
   }
 
   const obj = interview.toObject ? interview.toObject() : interview;
@@ -374,8 +489,16 @@ const updateInterview = asyncHandler(async (req, res) => {
     throw new Error('Interview not found.');
   }
 
-  // Check if user has permission to update
-  if (req.user.isAdmin || interview.interviewerId._id.toString() === req.user.id) {
+  // Role-based access control: Interviewers can ONLY update interviews assigned to them
+  const user = req.user;
+  if (user.isInterviewer && !user.isAdmin) {
+    if (interview.interviewerId._id.toString() !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to update this interview.');
+    }
+  }
+  // Admins can update any interview
+  if (user.isAdmin || interview.interviewerId._id.toString() === user.id.toString()) {
     // User has permission
   } else {
     res.status(StatusCodes.UNAUTHORIZED);

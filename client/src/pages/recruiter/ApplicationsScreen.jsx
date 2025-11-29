@@ -32,8 +32,8 @@ export default function CandidateApplicationsScreen() {
     refetch,
   } = useGetAllApplicationsQuery({
     role: 'recruiter',
-    recruiterId: userInfo.id,
   });
+  // Backend automatically filters by recruiter's jobs - no need to pass recruiterId
 
   const [
     updateApplication,

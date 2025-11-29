@@ -75,13 +75,13 @@ const TopNavbar = ({ navItems = [] }) => {
         >
           <img
             src={Logo}
-            alt="OptaHire Logo"
+            alt="EZYJOBS Logo"
             className={`h-10 w-10 transition-transform duration-500 ease-in-out ${
               isHover ? 'rotate-180 scale-110' : ''
             }`}
           />
           <span className="text-2xl font-semibold text-light-text dark:text-dark-text">
-            OptaHire
+            EZYJOBS
           </span>
         </Link>
 

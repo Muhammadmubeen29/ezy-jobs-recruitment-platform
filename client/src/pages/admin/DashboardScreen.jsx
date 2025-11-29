@@ -56,11 +56,14 @@ const COLORS = [
 // Custom tooltip component for consistency
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    // Convert label to string if it's a number (Recharts can pass numbers for numeric axes)
+    const labelText = label !== undefined && label !== null ? String(label) : '';
+    
     return (
       <div className="rounded-md border border-light-border bg-light-surface p-3 shadow-lg dark:border-dark-border dark:bg-dark-surface">
-        {label && (
+        {labelText && (
           <p className="font-medium text-light-text dark:text-dark-text">
-            {label}
+            {labelText}
           </p>
         )}
         {payload.map((entry, index) => (
@@ -81,7 +84,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 CustomTooltip.propTypes = {
   active: PropTypes.bool,
   payload: PropTypes.array,
-  label: PropTypes.string,
+  label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 export default function DashboardScreen() {

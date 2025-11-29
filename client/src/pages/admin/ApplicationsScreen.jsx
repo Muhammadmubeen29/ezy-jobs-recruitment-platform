@@ -118,23 +118,36 @@ export default function ApplicationsScreen() {
     {
       key: 'candidateName',
       label: 'Candidate',
-      render: (application) =>
-        `${application.candidate.firstName} ${application.candidate.lastName}`,
+      render: (application) => {
+        const candidate = application.candidate || application.candidateId;
+        return candidate
+          ? `${candidate.firstName} ${candidate.lastName}`
+          : 'Candidate Not Found';
+      },
     },
     {
       key: 'email',
       label: 'Email',
-      render: (application) => application.candidate.email,
+      render: (application) => {
+        const candidate = application.candidate || application.candidateId;
+        return candidate?.email || 'N/A';
+      },
     },
     {
       key: 'jobTitle',
       label: 'Job Title',
-      render: (application) => application.job.title,
+      render: (application) => {
+        const job = application.job || application.jobId;
+        return job?.title || 'Job Not Found';
+      },
     },
     {
       key: 'location',
       label: 'Location',
-      render: (application) => application.job.location,
+      render: (application) => {
+        const job = application.job || application.jobId;
+        return job?.location || 'N/A';
+      },
     },
     {
       key: 'status',

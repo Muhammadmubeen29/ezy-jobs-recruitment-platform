@@ -15,13 +15,21 @@ const formatApplicationForResponse = (application) => {
 
   const appObj = application.toObject ? application.toObject() : { ...application };
 
-  // prefer populated fields if available
-  const job = appObj.job || appObj.jobId || null;
-  const candidate = appObj.candidate || appObj.candidateId || null;
+  // Always prioritize populated fields (candidateId/jobId) over any existing candidate/job fields
+  // Check if candidateId/jobId are populated objects (have _id property) rather than just ObjectIds
+  const job = (appObj.jobId && typeof appObj.jobId === 'object' && '_id' in appObj.jobId) 
+    ? appObj.jobId 
+    : (appObj.job || null);
+  const candidate = (appObj.candidateId && typeof appObj.candidateId === 'object' && '_id' in appObj.candidateId)
+    ? appObj.candidateId
+    : (appObj.candidate || null);
 
   // remove old keys to avoid duplication
   delete appObj.jobId;
   delete appObj.candidateId;
+  // Also remove any existing candidate/job fields to avoid confusion
+  delete appObj.candidate;
+  delete appObj.job;
 
   return {
     ...appObj,
@@ -163,22 +171,53 @@ const createApplication = asyncHandler(async (req, res) => {
 const getAllApplications = asyncHandler(async (req, res) => {
   const { role, status, applicationDate, jobId, candidateId, interviewerId } =
     req.query;
+  const user = req.user;
   let query = {};
 
-  if (role) {
+  // STRICT ROLE-BASED DATA ISOLATION - Auto-detect role and enforce filtering
+  // IGNORE all recruiterId query params from frontend - always use req.user.id
+  
+  if (user) {
+    // Recruiters MUST only see applications for their own jobs
+    // STEP 1: Find all jobs that belong to current recruiter
+    if (user.isRecruiter && !user.isAdmin) {
+      const myJobs = await Job.find({ recruiterId: user.id }).select('_id');
+      // STEP 2: Extract job IDs
+      const jobIds = myJobs.map(j => j._id);
+      // STEP 3: Get ONLY applications for those jobs
+      if (jobIds.length > 0) {
+        query.jobId = { $in: jobIds };
+      } else {
+        // New recruiter with no jobs = no applications (guaranteed zero data leak)
+        query.jobId = { $in: [] };
+      }
+    }
+    // Candidates see only their own applications
+    else if (user.isCandidate && !user.isRecruiter && !user.isInterviewer && !user.isAdmin) {
+      query.candidateId = user.id;
+    }
+    // Interviewers see shortlisted applications (existing logic)
+    else if (user.isInterviewer && !user.isAdmin) {
+      query.status = { $in: ['shortlisted'] };
+    }
+    // Admins see all applications (no filter)
+  }
+
+  // Apply role-based filtering from query param only if not already set above
+  // This allows explicit role filtering for edge cases, but recruiter filtering is always enforced
+  if (role && !(user?.isRecruiter && !user?.isAdmin)) {
     switch (role) {
       case 'candidate':
-        query.candidateId = req.user.id;
+        if (!query.candidateId) {
+          query.candidateId = user?.id;
+        }
         break;
       case 'interviewer':
-        query.status = { $in: ['shortlisted'] };
+        if (!query.status) {
+          query.status = { $in: ['shortlisted'] };
+        }
         break;
-      case 'recruiter':
-        // For recruiter, we need to find applications for jobs they posted
-        const recruiterJobs = await Job.find({ recruiterId: req.user.id }).select('_id');
-        const recruiterJobIds = recruiterJobs.map(job => job._id);
-        query.jobId = { $in: recruiterJobIds };
-        break;
+      // 'recruiter' case is already handled above - ignore it here
     }
   }
 
@@ -192,12 +231,27 @@ const getAllApplications = asyncHandler(async (req, res) => {
     };
   }
 
+  // Only allow jobId filter if it belongs to the recruiter (for recruiters)
   if (jobId) {
-    query.jobId = jobId;
+    if (user?.isRecruiter && !user?.isAdmin) {
+      // Verify the job belongs to the recruiter
+      const job = await Job.findById(jobId);
+      if (job && job.recruiterId.toString() === user.id.toString()) {
+        query.jobId = jobId;
+      } else {
+        // Job doesn't belong to recruiter, return empty
+        query.jobId = { $in: [] };
+      }
+    } else {
+      query.jobId = jobId;
+    }
   }
 
   if (candidateId) {
-    query.candidateId = candidateId;
+    // Only allow if user is admin or viewing their own applications
+    if (user?.isAdmin || candidateId === user?.id?.toString()) {
+      query.candidateId = candidateId;
+    }
   }
 
   if (interviewerId) {
@@ -214,8 +268,17 @@ const getAllApplications = asyncHandler(async (req, res) => {
     }
   }
 
+  // Query applications - filtering is already applied in query object above
+  // For recruiters, query.jobId is already set to only their job IDs, so no additional filtering needed
   const applications = await Application.find(query)
-    .populate('jobId', 'title company category location')
+    .populate({
+      path: 'jobId',
+      select: 'title company category location recruiterId',
+      populate: {
+        path: 'recruiterId',
+        select: 'firstName lastName email'
+      }
+    })
     .populate('candidateId', 'firstName lastName email')
     .sort({ applicationDate: -1 });
 
@@ -255,8 +318,16 @@ const getAllApplications = asyncHandler(async (req, res) => {
  */
 
 const getApplicationById = asyncHandler(async (req, res) => {
+  const user = req.user;
   const application = await Application.findById(req.params.id)
-    .populate('jobId', 'title company category location')
+    .populate({
+      path: 'jobId',
+      select: 'title company category location recruiterId',
+      populate: {
+        path: 'recruiterId',
+        select: 'firstName lastName email'
+      }
+    })
     .populate('candidateId', 'firstName lastName email');
 
   if (!application) {
@@ -264,6 +335,25 @@ const getApplicationById = asyncHandler(async (req, res) => {
     throw new Error(
       'No application found with the specified ID. Please try again.'
     );
+  }
+
+  // STRICT OWNERSHIP CHECK - Recruiters can ONLY access applications for their jobs
+  if (user) {
+    if (user.isRecruiter && !user.isAdmin) {
+      const job = application.jobId;
+      if (!job || job.recruiterId._id.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this application.');
+      }
+    }
+    // Candidates can see their own applications
+    else if (user.isCandidate && !user.isRecruiter && !user.isInterviewer && !user.isAdmin) {
+      if (application.candidateId._id.toString() !== user.id.toString()) {
+        res.status(StatusCodes.FORBIDDEN);
+        throw new Error('You do not have permission to access this application.');
+      }
+    }
+    // Admins can see all applications (no restriction)
   }
 
   res.status(StatusCodes.OK).json({
@@ -287,6 +377,7 @@ const getApplicationById = asyncHandler(async (req, res) => {
  */
 
 const getApplicationsByJobId = asyncHandler(async (req, res) => {
+  const user = req.user;
   const job = await Job.findById(req.params.jobId);
 
   if (!job) {
@@ -294,8 +385,25 @@ const getApplicationsByJobId = asyncHandler(async (req, res) => {
     throw new Error('The requested job posting could not be found.');
   }
 
+  // STRICT OWNERSHIP CHECK - Must be done BEFORE sending response
+  // Recruiters can ONLY access applications for their jobs
+  if (user?.isRecruiter && !user?.isAdmin) {
+    const jobRecruiterId = job.recruiterId?.toString();
+    if (jobRecruiterId !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to access applications for this job.');
+    }
+  }
+
   const applications = await Application.find({ jobId: req.params.jobId })
-    .populate('jobId', 'title company category location')
+    .populate({
+      path: 'jobId',
+      select: 'title company category location recruiterId',
+      populate: {
+        path: 'recruiterId',
+        select: 'firstName lastName email'
+      }
+    })
     .populate('candidateId', 'firstName lastName email');
 
   if (!applications || applications.length === 0) {
@@ -334,6 +442,7 @@ const getApplicationsByJobId = asyncHandler(async (req, res) => {
 
 const updateApplication = asyncHandler(async (req, res) => {
   const { status } = req.body;
+  const user = req.user;
 
   const validStatuses = ['applied', 'shortlisted', 'rejected', 'hired'];
 
@@ -351,14 +460,27 @@ const updateApplication = asyncHandler(async (req, res) => {
       }
     });
 
+  // STRICT OWNERSHIP CHECK - Recruiters can ONLY update applications for their jobs
+  if (user?.isRecruiter && !user?.isAdmin) {
+    const job = application.jobId;
+    if (!job || job.recruiterId._id.toString() !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to update this application.');
+    }
+  }
+
   if (!application) {
     res.status(StatusCodes.NOT_FOUND);
     throw new Error('Unable to locate the specified application.');
   }
 
-  if (req.user.isRecruiter && application.jobId.recruiterId._id.toString() !== req.user.id) {
-    res.status(StatusCodes.UNAUTHORIZED);
-    throw new Error('You do not have permission to update this application.');
+  // STRICT OWNERSHIP CHECK - Recruiters can ONLY update applications for their jobs
+  if (user?.isRecruiter && !user?.isAdmin) {
+    const job = application.jobId;
+    if (!job || job.recruiterId._id.toString() !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You do not have permission to update this application.');
+    }
   }
 
   const updatedApplication = await Application.findByIdAndUpdate(
@@ -477,6 +599,21 @@ const deleteApplication = asyncHandler(async (req, res) => {
     );
   }
 
+  // Store application data before deletion for email notifications
+  const applicationData = {
+    candidateId: application.candidateId,
+    jobId: application.jobId,
+    applicationDate: application.applicationDate,
+    status: application.status,
+  };
+
+  // Fetch related data before deletion (for email notifications)
+  const [candidate, job] = await Promise.all([
+    User.findById(application.candidateId),
+    Job.findById(application.jobId),
+  ]);
+
+  // Delete the application
   const deletedApplication = await Application.findByIdAndDelete(req.params.id);
 
   if (!deletedApplication) {
@@ -484,68 +621,67 @@ const deleteApplication = asyncHandler(async (req, res) => {
     throw new Error('Failed to delete application. Please try again later.');
   }
 
-  const [candidate, job] = await Promise.all([
-    User.findById(application.candidateId),
-    Job.findById(application.jobId),
-  ]);
+  // Try to send emails, but don't fail the deletion if emails fail
+  try {
+    if (job && candidate) {
+      const recruiter = await User.findById(job.recruiterId);
 
-  const recruiter = await User.findById(job.recruiterId);
+      if (recruiter) {
+        const emailContent = [
+          {
+            type: 'heading',
+            value: 'Application Record Deleted',
+          },
+          {
+            type: 'text',
+            value: `This application record has been permanently removed from the system.`,
+          },
+          {
+            type: 'heading',
+            value: 'Application Details',
+          },
+          {
+            type: 'list',
+            value: [
+              `Job Title: ${job.title || 'N/A'}`,
+              `Company: ${job.company || 'N/A'}`,
+              `Candidate: ${candidate.firstName || ''} ${candidate.lastName || ''}`,
+              `Application Date: ${new Date(
+                applicationData.applicationDate
+              ).toLocaleString()}`,
+              `Status: ${applicationData.status}`,
+            ],
+          },
+        ];
 
-  const emailContent = [
-    {
-      type: 'heading',
-      value: 'Application Record Deleted',
-    },
-    {
-      type: 'text',
-      value: `This application record has been permanently removed from the system.`,
-    },
-    {
-      type: 'heading',
-      value: 'Application Details',
-    },
-    {
-      type: 'list',
-      value: [
-        `Job Title: ${job.title}`,
-        `Company: ${job.company}`,
-        `Candidate: ${candidate.firstName} ${candidate.lastName}`,
-        `Application Date: ${new Date(
-          application.applicationDate
-        ).toLocaleString()}`,
-        `Status: ${application.status}`,
-      ],
-    },
-  ];
-
-  const isEmailSent = await Promise.all([
-    sendEmail(res, {
-      from: process.env.NODEMAILER_SMTP_EMAIL,
-      to: recruiter.email,
-      subject: 'EZY Jobs - Application Record Deleted',
-      html: generateEmailTemplate({
-        firstName: recruiter.firstName,
-        subject: 'Application Record Deleted',
-        content: emailContent,
-      }),
-    }),
-    sendEmail(res, {
-      from: process.env.NODEMAILER_SMTP_EMAIL,
-      to: candidate.email,
-      subject: 'EZY Jobs - Application Record Deleted',
-      html: generateEmailTemplate({
-        firstName: candidate.firstName,
-        subject: 'Application Record Deleted',
-        content: emailContent,
-      }),
-    }),
-  ]);
-
-  if (!isEmailSent) {
-    res.status(StatusCodes.BAD_REQUEST);
-    throw new Error(
-      'Application record deleted but email could not be delivered.'
-    );
+        // Send emails in background - don't wait for them or fail if they error
+        Promise.all([
+          sendEmail(res, {
+            from: process.env.NODEMAILER_SMTP_EMAIL,
+            to: recruiter.email,
+            subject: 'EZY Jobs - Application Record Deleted',
+            html: generateEmailTemplate({
+              firstName: recruiter.firstName,
+              subject: 'Application Record Deleted',
+              content: emailContent,
+            }),
+          }).catch(err => console.error('Failed to send email to recruiter:', err)),
+          sendEmail(res, {
+            from: process.env.NODEMAILER_SMTP_EMAIL,
+            to: candidate.email,
+            subject: 'EZY Jobs - Application Record Deleted',
+            html: generateEmailTemplate({
+              firstName: candidate.firstName,
+              subject: 'Application Record Deleted',
+              content: emailContent,
+            }),
+          }).catch(err => console.error('Failed to send email to candidate:', err)),
+        ]).catch(err => console.error('Email sending error:', err));
+      }
+    }
+  } catch (emailError) {
+    // Log email errors but don't fail the deletion
+    console.error('Error sending deletion notification emails:', emailError);
   }
 
   res.status(StatusCodes.OK).json({

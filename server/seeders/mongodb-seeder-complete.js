@@ -16,7 +16,7 @@ const Interview = require('../models/interview');
 const InterviewerRating = require('../models/interviewerrating');
 const Transaction = require('../models/transaction');
 
-const { generateRemarks } = require('../utils/interview.utils');
+const { generateRoomId, generateRemarks } = require('../utils/interview.utils');
 
 const connectDB = async () => {
   try {
@@ -372,8 +372,8 @@ const seedJobs = async (users) => {
 
     const jobTitles = [
       'MERN Stack Developer', 'Frontend React Engineer', 'Backend Node.js Developer',
-      'Full Stack Engineer', 'UI UX Designer', 'DevOps Engineer', 'Cloud Architect',
-      'Mobile App Developer Flutter', 'QA Automation Engineer', 'Data Analyst',
+      'Full Stack Engineer', 'UI/UX Designer', 'DevOps Engineer', 'Cloud Architect',
+      'Mobile App Developer (Flutter)', 'QA Automation Engineer', 'Data Analyst',
       'Product Manager', 'Cybersecurity Analyst', 'AI Engineer', 'ML Engineer',
       'HR Manager', 'Business Development Executive', 'Software Architect', 
       'Database Administrator', 'Network Engineer', 'System Administrator',
@@ -442,15 +442,8 @@ const seedJobs = async (users) => {
 // ==================== SEED APPLICATIONS ====================
 const seedApplications = async (users, jobs) => {
   try {
-    // Drop the collection entirely to remove old indexes
-    try {
-      await Application.collection.drop();
-      console.log('🗑️  Dropped applications collection (removes old indexes)');
-    } catch (dropErr) {
-      // Collection might not exist
-      await Application.deleteMany({});
-      console.log('🗑️  Cleared existing applications');
-    }
+    await Application.deleteMany({});
+    console.log('🗑️  Cleared existing applications');
 
     const candidates = users.filter(u => u.isCandidate);
     const applications = [];
@@ -458,10 +451,10 @@ const seedApplications = async (users, jobs) => {
 
     // Generate 150 applications ensuring no duplicates
     let attempts = 0;
-    while (applications.length < 150 && attempts < 2000) {
+    while (applications.length < 150 && attempts < 1000) {
       const candidate = candidates[Math.floor(Math.random() * candidates.length)];
       const job = jobs[Math.floor(Math.random() * jobs.length)];
-      const key = `${job._id.toString()}-${candidate._id.toString()}`;
+      const key = `${job._id}-${candidate._id}`;
 
       if (!applicationSet.has(key)) {
         applicationSet.add(key);
@@ -482,19 +475,10 @@ const seedApplications = async (users, jobs) => {
       console.warn(`⚠️  Only generated ${applications.length} unique applications (requested 150)`);
     }
 
-    // Use ordered: false to continue past any duplicate errors
-    const createdApplications = await Application.insertMany(applications, { ordered: false });
+    const createdApplications = await Application.insertMany(applications);
     console.log(`✅ Created ${createdApplications.length} applications`);
     return createdApplications;
   } catch (err) {
-    // Even with ordered: false, we might get errors, but some records were inserted
-    if (err.writeErrors && err.result && err.result.insertedCount > 0) {
-      console.log(`✅ Created ${err.result.insertedCount} applications (some duplicates skipped)`);
-      // Return the inserted docs
-      const insertedIds = Object.values(err.result.insertedIds || {});
-      const insertedDocs = err.insertedDocs || [];
-      return insertedDocs.length > 0 ? insertedDocs : await Application.find({ _id: { $in: insertedIds } });
-    }
     console.error('❌ Error seeding applications:', err);
     throw err;
   }
@@ -603,7 +587,7 @@ const seedInterviews = async (users, jobs, applications) => {
 
       const status = isCompleted ? 'completed' : 'scheduled';
       
-      const interviewData = {
+      interviews.push({
         roomId,
         scheduledTime,
         interviewerId: interviewer._id,
@@ -612,16 +596,13 @@ const seedInterviews = async (users, jobs, applications) => {
         applicationId: application._id,
         status,
         remarks: generateRemarks(status, `${interviewer.firstName} ${interviewer.lastName}`, `${candidate.firstName} ${candidate.lastName}`, 'Developer Position'),
-      };
-
-      if (isCompleted) {
-        interviewData.callStartedAt = new Date(scheduledTime.getTime() + 5 * 60 * 1000);
-        interviewData.callEndedAt = new Date(scheduledTime.getTime() + 45 * 60 * 1000);
-        interviewData.rating = 3.5 + Math.random() * 1.5;
-        interviewData.summary = 'Interview completed successfully. Candidate showed strong technical skills and good communication.';
-      }
-
-      interviews.push(interviewData);
+        ...(isCompleted && {
+          callStartedAt: new Date(scheduledTime.getTime() + 5 * 60 * 1000),
+          callEndedAt: new Date(scheduledTime.getTime() + 45 * 60 * 1000),
+          rating: 3.5 + Math.random() * 1.5,
+          summary: 'Interview completed successfully. Candidate showed strong technical skills and good communication.',
+        }),
+      });
     }
 
     const createdInterviews = await Interview.insertMany(interviews);
@@ -753,3 +734,6 @@ if (require.main === module) {
 module.exports = {
   runSeeder,
 };
+
+
+

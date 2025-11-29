@@ -128,19 +128,39 @@ export default function TransactionsScreen() {
     {
       key: 'contract',
       label: 'Contract ID',
-      render: (tx) => tx.contractId,
+      render: (tx) => {
+        // Handle both populated object and string ID
+        const contractId = tx.contractId;
+        if (typeof contractId === 'string') {
+          return contractId;
+        }
+        if (contractId && typeof contractId === 'object') {
+          return contractId._id || contractId.id || 'N/A';
+        }
+        return 'N/A';
+      },
     },
     {
       key: 'recruiter',
       label: 'Recruiter',
-      render: (tx) =>
-        `${tx.contract.recruiter.firstName} ${tx.contract.recruiter.lastName}`,
+      render: (tx) => {
+        const contract = tx.contract || tx.contractId;
+        const recruiter = contract?.recruiter || contract?.recruiterId;
+        return recruiter
+          ? `${recruiter.firstName} ${recruiter.lastName}`
+          : 'Recruiter Not Found';
+      },
     },
     {
       key: 'interviewer',
       label: 'Interviewer',
-      render: (tx) =>
-        `${tx.contract.interviewer.firstName} ${tx.contract.interviewer.lastName}`,
+      render: (tx) => {
+        const contract = tx.contract || tx.contractId;
+        const interviewer = contract?.interviewer || contract?.interviewerId;
+        return interviewer
+          ? `${interviewer.firstName} ${interviewer.lastName}`
+          : 'Interviewer Not Found';
+      },
     },
     {
       key: 'transactionType',

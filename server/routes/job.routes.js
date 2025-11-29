@@ -18,7 +18,7 @@ const router = Router();
 router
   .route('/')
   .post(protectServer, authorizeServerRoles('isRecruiter'), createJob)
-  .get(getAllJobs);
+  .get(getAllJobs); // getAllJobs handles role-based filtering internally
 
 router
   .route('/:id')
@@ -28,6 +28,6 @@ router
     authorizeServerRoles('isRecruiter', 'isAdmin'),
     updateJobById
   )
-  .delete(protectServer, authorizeServerRoles('isAdmin'), deleteJobById);
+  .delete(protectServer, authorizeServerRoles('isRecruiter', 'isAdmin'), deleteJobById);
 
 module.exports = router;

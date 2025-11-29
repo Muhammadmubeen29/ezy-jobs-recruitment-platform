@@ -19,7 +19,7 @@ const router = Router();
 router
   .route('/')
   .post(protectServer, authorizeServerRoles('isCandidate'), createApplication)
-  .get(protectServer, getAllApplications);
+  .get(protectServer, getAllApplications); // getAllApplications handles role-based filtering internally
 
 router
   .route('/:id')

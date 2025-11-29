@@ -417,6 +417,12 @@ const styles = StyleSheet.create({
 
 // Enhanced PDF Document Component
 const ReportPDF = ({ reportData, startDate, endDate }) => {
+  // FIXED: Added guard to prevent undefined access
+  // CRASH PREVENTION: Ensure reportData exists, default to empty object to prevent crashes
+  const safeReportData = reportData || {};
+  const safeStartDate = startDate || formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const safeEndDate = endDate || formatDate(new Date(), 'yyyy-MM-dd');
+
   const renderTable = (title, data, columns) => {
     if (!data || data.length === 0) {
       return (
@@ -571,9 +577,15 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
   };
 
   const getMetrics = () => {
-    const { summary } = reportData;
+    // FIXED: Added guard to prevent undefined access
+    // CRASH PREVENTION: Ensure reportData and summary exist before accessing
+    if (!safeReportData || !safeReportData.summary) {
+      return [];
+    }
+    
+    const { summary } = safeReportData;
 
-    switch (reportData.reportType) {
+    switch (safeReportData.reportType) {
       case 'User Activity Report': {
         return [
           {
@@ -702,11 +714,15 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
 
         {/* Report Header */}
         <View style={styles.reportHeader}>
-          <Text style={styles.reportTitle}>{reportData.reportType}</Text>
+          {/* FIXED: Added fallback for reportType
+              CRASH PREVENTION: Ensure reportType exists or show default */}
+          <Text style={styles.reportTitle}>{safeReportData?.reportType || 'Report'}</Text>
           <View style={styles.reportMeta}>
+            {/* FIXED: Added guard for startDate and endDate
+                CRASH PREVENTION: Ensure dates exist and are valid before formatting */}
             <Text style={styles.reportMetaText}>
-              Period: {formatDate(startDate, 'full')} -{' '}
-              {formatDate(endDate, 'full')}
+              Period: {formatDate(safeStartDate, 'full')} -{' '}
+              {formatDate(safeEndDate, 'full')}
             </Text>
             <Text style={styles.reportDate}>
               Generated: {formatDate(new Date(), 'full')}
@@ -735,11 +751,13 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               and then render subsections within it. However, keeping it as per your original logic
               for now. */}
 
-          {reportData.reportType === 'User Activity Report' && (
+          {/* FIXED: Added optional chaining for all reportData accesses
+              CRASH PREVENTION: Ensure reportData and summary exist before accessing nested properties */}
+          {safeReportData?.reportType === 'User Activity Report' && (
             <>
               {renderTable(
                 'User Distribution by Role',
-                reportData.summary.usersByRole,
+                safeReportData?.summary?.usersByRole || [],
                 [
                   { key: 'role', label: 'User Role' },
                   { key: 'count', label: 'Total Count' },
@@ -747,7 +765,7 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               )}
               {renderTable(
                 'Top Rated Interviewers',
-                reportData.summary.topInterviewers,
+                safeReportData?.summary?.topInterviewers || [],
                 [
                   { key: 'name', label: 'Interviewer Name' },
                   { key: 'averageRating', label: 'Avg Rating' },
@@ -758,11 +776,11 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
             </>
           )}
 
-          {reportData.reportType === 'Job Performance Report' && (
+          {safeReportData?.reportType === 'Job Performance Report' && (
             <>
               {renderTable(
                 'Job Distribution by Category',
-                reportData.summary.jobsByCategory,
+                safeReportData?.summary?.jobsByCategory || [],
                 [
                   { key: 'category', label: 'Job Category' },
                   { key: 'jobCount', label: 'Total Jobs' },
@@ -770,7 +788,7 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               )}
               {renderTable(
                 'Most Popular Job Postings',
-                reportData.summary.popularJobs,
+                safeReportData?.summary?.popularJobs || [],
                 [
                   { key: 'title', label: 'Job Title' },
                   { key: 'company', label: 'Company' },
@@ -780,11 +798,11 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
             </>
           )}
 
-          {reportData.reportType === 'Financial Report' && (
+          {safeReportData?.reportType === 'Financial Report' && (
             <>
               {renderTable(
                 'Revenue by Transaction Type',
-                reportData.summary.revenueByType,
+                safeReportData?.summary?.revenueByType || [],
                 [
                   { key: 'transactionType', label: 'Transaction Type' },
                   { key: 'transactionCount', label: 'Count' },
@@ -802,7 +820,7 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               )}
               {renderTable(
                 'Top Revenue Generating Clients',
-                reportData.summary.topRecruiters,
+                safeReportData?.summary?.topRecruiters || [],
                 [
                   { key: 'name', label: 'Client Name' },
                   {
@@ -816,11 +834,11 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
             </>
           )}
 
-          {reportData.reportType === 'Interview Analytics Report' && (
+          {safeReportData?.reportType === 'Interview Analytics Report' && (
             <>
               {renderTable(
                 'Interview Status Overview',
-                reportData.summary.interviewStatusStats,
+                safeReportData?.summary?.interviewStatusStats || [],
                 [
                   { key: 'status', label: 'Interview Status' },
                   { key: 'count', label: 'Total Count' },
@@ -828,7 +846,7 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               )}
               {renderTable(
                 'Interviewer Performance Metrics',
-                reportData.summary.interviewerPerformance,
+                safeReportData?.summary?.interviewerPerformance || [],
                 [
                   { key: 'name', label: 'Interviewer' },
                   { key: 'totalInterviews', label: 'Total' },
@@ -844,11 +862,11 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
             </>
           )}
 
-          {reportData.reportType === 'Application Funnel Report' && (
+          {safeReportData?.reportType === 'Application Funnel Report' && (
             <>
               {renderTable(
                 'Application Pipeline Analysis',
-                reportData.summary.funnelStats,
+                safeReportData?.summary?.funnelStats || [],
                 [
                   { key: 'status', label: 'Pipeline Stage' },
                   { key: 'count', label: 'Applications' },
@@ -861,7 +879,7 @@ const ReportPDF = ({ reportData, startDate, endDate }) => {
               )}
               {renderTable(
                 'Hiring Success by Category',
-                reportData.summary.conversionByCategory,
+                safeReportData?.summary?.conversionByCategory || [],
                 [
                   { key: 'category', label: 'Job Category' },
                   { key: 'totalApplications', label: 'Total Applications' },
@@ -926,10 +944,14 @@ export default function ReportsScreen() {
 
   // State management
   const [reportType, setReportType] = useState('user-activity');
+  // FIXED: Initialize dates with safe default values
+  // CRASH PREVENTION: Always ensure startDate and endDate are valid strings
   const [startDate, setStartDate] = useState(
     formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
   );
   const [endDate, setEndDate] = useState(formatDate(new Date(), 'yyyy-MM-dd'));
+  // FIXED: Initialize reportData with null (checked before access) instead of undefined
+  // CRASH PREVENTION: Null is safer for checks, always use optional chaining
   const [reportData, setReportData] = useState(null);
   const [apiError, setApiError] = useState(null);
 
@@ -1042,7 +1064,82 @@ export default function ReportsScreen() {
       }
 
       if (result.data?.data) {
-        setReportData(result.data.data);
+        // Normalize the API response to ensure consistent structure
+        // API returns period: { start, end } but component expects dateRange: { startDate, endDate }
+        const rawData = result.data.data;
+        
+        // Map report type to display name
+        const reportTypeMap = {
+          'user-activity': 'User Activity Report',
+          'job-performance': 'Job Performance Report',
+          'financial': 'Financial Report',
+          'interview-analytics': 'Interview Analytics Report',
+          'application-funnel': 'Application Funnel Report',
+        };
+
+        // Normalize dateRange: API may return period: { start, end } or dateRange: { startDate, endDate }
+        // Always create a consistent dateRange object from either format, or fallback to state variables
+        let normalizedDateRange;
+        if (rawData.dateRange?.startDate && rawData.dateRange?.endDate) {
+          // Already has dateRange format
+          normalizedDateRange = {
+            startDate: rawData.dateRange.startDate,
+            endDate: rawData.dateRange.endDate,
+          };
+        } else if (rawData.period?.start && rawData.period?.end) {
+          // Convert period: { start, end } to dateRange: { startDate, endDate }
+          normalizedDateRange = {
+            startDate: rawData.period.start,
+            endDate: rawData.period.end,
+          };
+        } else {
+          // Fallback to state variables if API doesn't provide dates
+          normalizedDateRange = {
+            startDate,
+            endDate,
+          };
+        }
+
+        // Normalize trends: API may return trends nested differently
+        let normalizedTrends = null;
+        if (rawData.trends) {
+          normalizedTrends = rawData.trends;
+        } else {
+          // Build trends object from available data
+          normalizedTrends = {
+            registrationTrend: rawData.registrationTrend || [],
+            jobPostingTrend: rawData.jobPostingTrend || [],
+            revenueTrend: rawData.revenueTrend || [],
+            interviewTrends: rawData.interviewTrends || rawData.interviewTrend || [],
+            applicationTrends: rawData.applicationTrends || rawData.applicationTrend || [],
+          };
+        }
+
+        // Build normalized summary object
+        const normalizedSummary = {
+          ...rawData,
+          // Ensure arrays exist
+          usersByRole: rawData.usersByRole || [],
+          topInterviewers: rawData.topInterviewers || [],
+          jobsByCategory: rawData.jobsByCategory || [],
+          popularJobs: rawData.popularJobs || [],
+          revenueByType: rawData.revenueByType || [],
+          topRecruiters: rawData.topRecruiters || [],
+          interviewStatusStats: rawData.interviewStatusStats || [],
+          interviewerPerformance: rawData.interviewerPerformance || [],
+          funnelStats: rawData.funnelStats || [],
+          conversionByCategory: rawData.conversionByCategory || [],
+        };
+
+        // Set normalized report data with all required fields
+        setReportData({
+          reportType: reportTypeMap[reportType] || 'Report',
+          dateRange: normalizedDateRange,
+          trends: normalizedTrends,
+          summary: normalizedSummary,
+          ...rawData, // Spread to preserve any other fields
+        });
+
         trackEvent(
           'Generate Report Success',
           'Admin Action',
@@ -1068,6 +1165,8 @@ export default function ReportsScreen() {
 
   // Prepare chart data
   const prepareChartData = () => {
+    // FIXED: Added null check to prevent undefined access
+    // CRASH PREVENTION: Ensure trends exists before accessing nested properties
     if (!reportData?.trends) return null;
 
     const { trends } = reportData;
@@ -1117,6 +1216,8 @@ export default function ReportsScreen() {
 
   // Render metric cards - styled to match admin dashboard
   const renderMetricCards = () => {
+    // FIXED: Added null check to prevent undefined access
+    // CRASH PREVENTION: Ensure summary exists before rendering metrics
     if (!reportData?.summary) return null;
 
     const { summary } = reportData;
@@ -1307,6 +1408,8 @@ export default function ReportsScreen() {
 
   // Render data tables
   const renderDataTables = () => {
+    // FIXED: Added null check to prevent undefined access
+    // CRASH PREVENTION: Ensure summary exists before accessing nested arrays
     if (!reportData?.summary) return null;
 
     const { summary } = reportData;
@@ -1817,27 +1920,49 @@ export default function ReportsScreen() {
               <div className="flex flex-col items-start justify-between gap-4 rounded-xl bg-light-surface p-6 shadow-md dark:bg-dark-surface sm:flex-row">
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">
-                    {reportData.reportType}
+                    {/* FIXED: Added fallback for reportType
+                        CRASH PREVENTION: Ensure reportType exists or show default */}
+                    {reportData.reportType || 'Report'}
                   </h2>
                   <p className="mt-1 text-light-text/70 dark:text-dark-text/70">
                     Period:{' '}
-                    {formatDate(new Date(reportData.dateRange.startDate))} -{' '}
-                    {formatDate(new Date(reportData.dateRange.endDate))}
+                    {/* FIXED: Added optional chaining and fallback to state variables
+                        CRASH CAUSE: reportData.dateRange was undefined when API returned period: { start, end }
+                        instead of dateRange: { startDate, endDate }
+                        SOLUTION: Use optional chaining (?.startDate) and fallback to component state (startDate/endDate)
+                        The normalization in generateReport() ensures dateRange exists, but this guard prevents crashes */}
+                    {formatDate(
+                      new Date(
+                        reportData.dateRange?.startDate ||
+                          reportData.period?.start ||
+                          startDate
+                      )
+                    )}{' '}
+                    -{' '}
+                    {formatDate(
+                      new Date(
+                        reportData.dateRange?.endDate ||
+                          reportData.period?.end ||
+                          endDate
+                      )
+                    )}
                   </p>
                   <p className="text-sm text-light-text/60 dark:text-dark-text/60">
                     Generated: {formatDate(new Date())}
                   </p>
                 </div>
                 <div>
+                  {/* FIXED: Added guard to ensure reportData and reportType exist before PDF generation
+                      CRASH PREVENTION: Prevent errors when generating PDF filename */}
                   <PDFDownloadLink
                     document={
                       <ReportPDF
-                        reportData={reportData}
-                        startDate={startDate}
-                        endDate={endDate}
+                        reportData={reportData || {}}
+                        startDate={startDate || formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')}
+                        endDate={endDate || formatDate(new Date(), 'yyyy-MM-dd')}
                       />
                     }
-                    fileName={`OptaHire_${reportData.reportType.replace(/\s+/g, '_')}_${startDate}_${endDate}.pdf`}
+                    fileName={`OptaHire_${(reportData?.reportType || 'Report').replace(/\s+/g, '_')}_${startDate}_${endDate}.pdf`}
                     className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-all hover:bg-green-700"
                     onClick={() =>
                       trackEvent(

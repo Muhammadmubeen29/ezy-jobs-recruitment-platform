@@ -30,6 +30,7 @@ function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+92');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [password, setPassword] = useState('');
@@ -65,7 +66,8 @@ function RegisterScreen() {
         break;
       case 'phone':
         setPhone(value);
-        setErrors((prev) => ({ ...prev, phone: validatePhone(value) }));
+        // Validate against combined country code + phone number
+        setErrors((prev) => ({ ...prev, phone: validatePhone(`${countryCode}${value}`) }));
         break;
       case 'email':
         setEmail(value);
@@ -117,7 +119,7 @@ function RegisterScreen() {
     const newErrors = {
       firstName: validateName(firstName),
       lastName: validateName(lastName),
-      phone: validatePhone(phone),
+      phone: validatePhone(`${countryCode}${phone}`),
       email: validateEmail(email),
       password: validatePassword(password),
       confirmPassword: validateConfirmPassword(confirmPassword, password),
@@ -133,7 +135,7 @@ function RegisterScreen() {
       const result = await register({
         firstName,
         lastName,
-        phone,
+        phone: `${countryCode}${phone}`,
         email,
         password,
         role,
@@ -170,15 +172,15 @@ function RegisterScreen() {
     <>
       <Helmet>
         <title>
-          Register - OptaHire | Join the AI-Powered Recruitment Platform
+          Register - EZYJOBS | Join the AI-Powered Recruitment Platform
         </title>
         <meta
           name="description"
-          content="Join OptaHire - Create your account as a recruiter, candidate, or interviewer. Start your AI-powered recruitment journey today."
+          content="Join EZYJOBS - Create your account as a recruiter, candidate, or interviewer. Start your AI-powered recruitment journey today."
         />
         <meta
           name="keywords"
-          content="OptaHire Register, Join OptaHire, Recruitment Signup, Create Account, AI Recruitment"
+          content="EZYJOBS Register, Join EZYJOBS, Recruitment Signup, Create Account, AI Recruitment"
         />
       </Helmet>
       <section className="flex min-h-screen items-center justify-center bg-light-background px-4 py-14 dark:bg-dark-background">
@@ -196,25 +198,26 @@ function RegisterScreen() {
           </div>
         ) : (
           <div className="mx-auto w-full max-w-lg animate-slideUp">
-            <h1 className="mb-6 text-center text-3xl font-bold text-light-text dark:text-dark-text sm:text-4xl md:text-5xl">
-              Join{' '}
-              <span className="text-light-primary dark:text-dark-primary">
-                OptaHire
-              </span>
-            </h1>
-            <p className="mb-8 text-center text-lg text-light-text/70 dark:text-dark-text/70">
-              Create your account and start optimizing your recruitment journey
-              with AI-powered candidate matching.
-            </p>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-8">
+              <h1 className="mb-4 text-center text-3xl font-bold text-light-text dark:text-dark-text sm:text-4xl md:text-5xl">
+                Join{' '}
+                <span className="text-light-primary dark:text-dark-primary">
+                  EZYJOBS
+                </span>
+              </h1>
+              <p className="mb-6 text-center text-base text-light-text/70 dark:text-dark-text/70">
+                Create your account and start optimizing your recruitment journey
+                with AI-powered candidate matching.
+              </p>
 
-            {error && <Alert message={error.data.message} />}
+              {error && <Alert message={error.data.message} />}
 
-            {isSuccess && data.data?.message && (
-              <Alert message={data.data?.message} isSuccess={true} />
-            )}
+              {isSuccess && data.data?.message && (
+                <Alert message={data.data?.message} isSuccess={true} />
+              )}
 
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-1">
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InputField
                   id="firstName"
                   type="text"
@@ -252,15 +255,40 @@ function RegisterScreen() {
                     <p className="mt-1 text-sm text-red-500">{errors.role}</p>
                   )}
                 </div>
+                <div className="mb-6 flex gap-2">
+                  <div className="w-25">
+                    <label htmlFor="countryCode" className="sr-only">Country</label>
+                    <select
+                      id="countryCode"
+                      value={countryCode}
+                      onChange={(e) => {
+                        setCountryCode(e.target.value);
+                        // re-validate phone with new country code
+                        setErrors((prev) => ({ ...prev, phone: validatePhone(`${e.target.value}${phone}`) }));
+                      }}
+                      className="w-full rounded-lg border border-light-border bg-light-background p-3 text-light-text transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-light-primary dark:border-dark-border dark:bg-dark-background dark:text-dark-text dark:focus:ring-dark-primary"
+                    >
+                      <option value="+92">🇵🇰 +92 </option>
+                      <option value="+1">🇺🇸 +1 </option>
+                      <option value="+44">🇬🇧 +44 </option>
+                      <option value="+91">🇮🇳 +91 </option>
+                      <option value="+61">🇦🇺 +61 </option>
+                      <option value="+1">🇨🇦 +1 </option>
+                    </select>
+                  </div>
 
-                <InputField
-                  id="phone"
-                  type="tel"
-                  label="Phone Number"
-                  value={phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  validationMessage={errors.phone}
-                />
+                  <div className="flex-1">
+                    <InputField
+                      id="phone"
+                      type="tel"
+                      label="Phone Number"
+                      placeholder="e.g., 3012345678"
+                      value={phone}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                      validationMessage={errors.phone}
+                    />
+                  </div>
+                </div>
               </div>
 
               <InputField
@@ -312,16 +340,16 @@ function RegisterScreen() {
                 }
                 validationMessage={errors.confirmPassword}
               />
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-light-primary py-2 text-lg font-semibold text-white shadow-md transition-all duration-300 hover:bg-light-secondary dark:bg-dark-primary dark:hover:bg-dark-secondary sm:py-3"
-                disabled={isLoading}
-              >
-                Register
-              </button>
+                <button
+                  type="submit"
+                  className="w-full rounded-lg bg-light-primary py-3 text-lg font-semibold text-white shadow-md transition-transform duration-150 hover:scale-[1.01] hover:bg-light-secondary dark:bg-dark-primary dark:hover:bg-dark-secondary"
+                  disabled={isLoading}
+                >
+                  Register
+                </button>
             </form>
 
-            <div className="mt-4 text-center sm:mt-6">
+              <div className="mt-4 text-center sm:mt-6">
               <p className="text-light-text dark:text-dark-text">
                 Already have an account?{' '}
                 <Link
@@ -338,6 +366,7 @@ function RegisterScreen() {
                   Login
                 </Link>
               </p>
+              </div>
             </div>
           </div>
         )}

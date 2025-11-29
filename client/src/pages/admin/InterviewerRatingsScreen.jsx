@@ -116,17 +116,30 @@ export default function InterviewerRatingsScreen() {
     {
       key: 'interviewer',
       label: 'Interviewer',
-      render: (r) => `${r.interviewer.firstName} ${r.interviewer.lastName}`,
+      render: (r) => {
+        const interviewer = r.interviewer || r.interviewerId;
+        return interviewer
+          ? `${interviewer.firstName} ${interviewer.lastName}`
+          : 'Interviewer Not Found';
+      },
     },
     {
       key: 'recruiter',
       label: 'Recruiter',
-      render: (r) => `${r.recruiter.firstName} ${r.recruiter.lastName}`,
+      render: (r) => {
+        const recruiter = r.recruiter || r.recruiterId;
+        return recruiter
+          ? `${recruiter.firstName} ${recruiter.lastName}`
+          : 'Recruiter Not Found';
+      },
     },
     {
       key: 'job',
       label: 'Job',
-      render: (r) => r.job.title,
+      render: (r) => {
+        const job = r.job || r.jobId;
+        return job?.title || 'Job Not Found';
+      },
     },
     {
       key: 'rating',
