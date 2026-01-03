@@ -12,9 +12,10 @@ const { generateRoomId, generateRemarks } = require('../utils/interview.utils');
 
 /**
  * @desc Create a new interview
+ * SIMPLIFIED: Now supports recruiters creating interviews
  *
  * @route POST /api/interviews
- * @access Private (Interviewer)
+ * @access Private (Recruiter, Interviewer)
  *
  * @param {Object} req - Request object
  * @param {Object} res - Response object
@@ -23,17 +24,74 @@ const { generateRoomId, generateRemarks } = require('../utils/interview.utils');
  */
 
 const createInterview = asyncHandler(async (req, res) => {
-  const interviewerId = req.user.id;
-  const { scheduledTime, candidateId, jobId, applicationId } = req.body;
+  const user = req.user;
+  // SIMPLIFIED: Support both new format (date + time) and legacy format (scheduledTime)
+  const { 
+    scheduledDate, 
+    scheduledTimeString, 
+    scheduledTime: legacyScheduledTime, // Legacy support
+    candidateId, 
+    jobId, 
+    applicationId,
+    interviewerId: providedInterviewerId,
+    meetingType,
+    notes
+  } = req.body;
 
-  if (!scheduledTime || !candidateId || !jobId || !applicationId) {
-    res.status(StatusCodes.BAD_REQUEST);
-    throw new Error(
-      'Please provide all required information to schedule the interview.'
-    );
+  // Determine interviewer and recruiter based on user role
+  let interviewerId;
+  let recruiterId;
+
+  if (user.isRecruiter && !user.isAdmin) {
+    // Recruiter creating interview - must provide interviewerId
+    recruiterId = user.id;
+    interviewerId = providedInterviewerId;
+
+    if (!interviewerId) {
+      res.status(StatusCodes.BAD_REQUEST);
+      throw new Error('Interviewer is required when creating an interview as a recruiter.');
+    }
+  } else if (user.isInterviewer && !user.isAdmin) {
+    // Interviewer creating interview - use their own ID
+    interviewerId = user.id;
+  } else {
+    res.status(StatusCodes.FORBIDDEN);
+    throw new Error('Only recruiters or interviewers can create interviews.');
   }
 
-  if (new Date(scheduledTime) <= new Date()) {
+  // Determine the scheduled datetime
+  let scheduledDateTime;
+  let scheduledDateObj;
+  let scheduledTimeStr;
+
+  // Support both new format (scheduledDate + scheduledTimeString) and legacy (scheduledTime)
+  if (scheduledDate && scheduledTimeString) {
+    // New simplified format
+    scheduledDateObj = new Date(scheduledDate);
+    scheduledTimeStr = scheduledTimeString;
+    scheduledDateTime = new Date(`${scheduledDate}T${scheduledTimeString}`);
+  } else if (legacyScheduledTime) {
+    // Legacy format support
+    scheduledDateTime = new Date(legacyScheduledTime);
+    scheduledDateObj = scheduledDateTime;
+    scheduledTimeStr = scheduledDateTime.toTimeString().slice(0, 5); // Extract HH:mm
+  } else {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error('Please provide either (scheduledDate + scheduledTimeString) or scheduledTime.');
+  }
+
+  // Validate required fields
+  if (!candidateId || !jobId || !applicationId) {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error('Please provide candidateId, jobId, and applicationId.');
+  }
+
+  if (isNaN(scheduledDateTime.getTime())) {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error('Invalid date or time format.');
+  }
+
+  if (scheduledDateTime <= new Date()) {
     res.status(StatusCodes.BAD_REQUEST);
     throw new Error('Interview must be scheduled for a future date and time.');
   }
@@ -43,6 +101,14 @@ const createInterview = asyncHandler(async (req, res) => {
     throw new Error('An interviewer cannot interview themselves.');
   }
 
+  // Validate meeting type if provided
+  const validMeetingTypes = ['Online', 'On-site', 'Phone'];
+  const finalMeetingType = meetingType || 'Online';
+  if (!validMeetingTypes.includes(finalMeetingType)) {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error(`Meeting type must be one of: ${validMeetingTypes.join(', ')}`);
+  }
+
   const job = await Job.findById(jobId).populate('recruiterId', 'firstName lastName email');
 
   if (!job) {
@@ -50,16 +116,34 @@ const createInterview = asyncHandler(async (req, res) => {
     throw new Error('The specified job position was not found.');
   }
 
+  // If recruiter created this, verify they own the job
+  if (user.isRecruiter && !user.isAdmin) {
+    const jobRecruiterId = job.recruiterId?._id?.toString() || job.recruiterId?.toString();
+    if (jobRecruiterId !== user.id.toString()) {
+      res.status(StatusCodes.FORBIDDEN);
+      throw new Error('You can only create interviews for your own job postings.');
+    }
+    recruiterId = user.id;
+  } else {
+    // Interviewer creating - get recruiter from job
+    recruiterId = job.recruiterId?._id || job.recruiterId;
+  }
+
   const [interviewer, candidate, recruiter, application] = await Promise.all([
     User.findById(interviewerId),
     User.findById(candidateId),
-    User.findById(job.recruiterId),
+    User.findById(recruiterId),
     Application.findById(applicationId),
   ]);
 
-  if (!interviewer || !candidate) {
+  if (!interviewer || !interviewer.isInterviewer) {
     res.status(StatusCodes.NOT_FOUND);
-    throw new Error('Could not find the specified interviewer or candidate.');
+    throw new Error('Interviewer not found or is not a valid interviewer.');
+  }
+
+  if (!candidate || !candidate.isCandidate) {
+    res.status(StatusCodes.NOT_FOUND);
+    throw new Error('Candidate not found or is not a valid candidate.');
   }
 
   if (!application) {
@@ -67,19 +151,38 @@ const createInterview = asyncHandler(async (req, res) => {
     throw new Error('The specified job application was not found.');
   }
 
-  // Check for existing interviews at the same time
+  // Verify application belongs to the candidate and job
+  if (application.candidateId.toString() !== candidateId || application.jobId.toString() !== jobId) {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error('Application does not match the provided candidate or job.');
+  }
+
+  // Check for existing interviews at the same time (prevent double booking)
   const existingInterview = await Interview.findOne({
+    status: { $in: ['scheduled', 'rescheduled'] },
     $or: [
-      { interviewerId, scheduledTime: new Date(scheduledTime) },
-      { candidateId, scheduledTime: new Date(scheduledTime) },
+      { interviewerId, scheduledDateTime: scheduledDateTime },
+      { candidateId, scheduledDateTime: scheduledDateTime },
       {
         $and: [
           { $or: [{ interviewerId }, { candidateId }] },
           {
-            scheduledTime: {
-              $gte: new Date(new Date(scheduledTime).getTime() - 30 * 60000),
-              $lte: new Date(new Date(scheduledTime).getTime() + 30 * 60000),
-            }
+            $or: [
+              { scheduledDateTime: scheduledDateTime },
+              { scheduledTime: scheduledDateTime },
+              {
+                scheduledDateTime: {
+                  $gte: new Date(scheduledDateTime.getTime() - 30 * 60000), // 30 minutes before
+                  $lte: new Date(scheduledDateTime.getTime() + 30 * 60000), // 30 minutes after
+                }
+              },
+              {
+                scheduledTime: {
+                  $gte: new Date(scheduledDateTime.getTime() - 30 * 60000),
+                  $lte: new Date(scheduledDateTime.getTime() + 30 * 60000),
+                }
+              }
+            ]
           }
         ]
       }
@@ -89,22 +192,28 @@ const createInterview = asyncHandler(async (req, res) => {
   if (existingInterview) {
     res.status(StatusCodes.CONFLICT);
     throw new Error(
-      'An interview is already scheduled at this time. Please choose a different time slot.'
+      'An interview is already scheduled at this time for one of the participants. Please choose a different time slot.'
     );
   }
 
-  const roomId = generateRoomId();
-  const remarks = generateRemarks();
+  // Generate roomId only if meeting type is Online (for future WebRTC)
+  const roomId = finalMeetingType === 'Online' ? generateRoomId() : undefined;
 
   const interview = await Interview.create({
+    recruiterId,
     interviewerId,
     candidateId,
     jobId,
     applicationId,
-    scheduledTime: new Date(scheduledTime),
+    scheduledDate: scheduledDateObj,
+    scheduledTimeString: scheduledTimeStr,
+    scheduledDateTime,
+    scheduledTime: scheduledDateTime, // Keep for backward compatibility
+    meetingType: finalMeetingType,
+    notes: notes || '',
     status: 'scheduled',
     roomId,
-    remarks,
+    remarks: `Interview scheduled for ${job.title} position`,
   });
 
   if (!interview) {
@@ -129,12 +238,15 @@ const createInterview = asyncHandler(async (req, res) => {
     {
       type: 'list',
       value: [
-        `Date & Time: ${new Date(scheduledTime).toLocaleString()}`,
+        `Date: ${scheduledDateObj.toLocaleDateString()}`,
+        `Time: ${scheduledTimeStr}`,
         `Position: ${job.title}`,
         `Company: ${job.company}`,
+        `Meeting Type: ${finalMeetingType}`,
         `Interviewer: ${interviewer.firstName} ${interviewer.lastName}`,
         `Candidate: ${candidate.firstName} ${candidate.lastName}`,
-        `Room ID: ${roomId}`,
+        ...(roomId ? [`Room ID: ${roomId}`] : []),
+        ...(notes ? [`Notes: ${notes}`] : []),
       ],
     },
     {
@@ -146,35 +258,39 @@ const createInterview = asyncHandler(async (req, res) => {
     },
   ];
 
-  const isEmailSent = await Promise.all([
-    sendEmail(res, {
-      from: process.env.NODEMAILER_SMTP_EMAIL,
-      to: candidate.email,
-      subject: 'EZY Jobs - Interview Scheduled',
-      html: generateEmailTemplate({
-        firstName: candidate.firstName,
-        subject: 'Interview Scheduled',
-        content: emailContent,
-      }),
-    }),
-    sendEmail(res, {
-      from: process.env.NODEMAILER_SMTP_EMAIL,
-      to: recruiter.email,
-      subject: 'EZY Jobs - Interview Scheduled',
-      html: generateEmailTemplate({
-        firstName: recruiter.firstName,
-        subject: 'Interview Scheduled',
-        content: emailContent,
-      }),
-    }),
-  ]);
+  // FIXED: Don't block interview creation if emails fail
+  // Send email notifications - log errors but don't fail the request
+  (async () => {
+    try {
+      await sendEmail(res, {
+        from: process.env.NODEMAILER_SMTP_EMAIL,
+        to: candidate.email,
+        subject: 'EZY Jobs - Interview Scheduled',
+        html: generateEmailTemplate({
+          firstName: candidate.firstName,
+          subject: 'Interview Scheduled',
+          content: emailContent,
+        }),
+      });
+    } catch (emailError) {
+      console.error('Failed to send email to candidate:', emailError.message);
+    }
 
-  if (!isEmailSent) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR);
-    throw new Error(
-      'Interview created but notification emails could not be sent.'
-    );
-  }
+    try {
+      await sendEmail(res, {
+        from: process.env.NODEMAILER_SMTP_EMAIL,
+        to: recruiter.email,
+        subject: 'EZY Jobs - Interview Scheduled',
+        html: generateEmailTemplate({
+          firstName: recruiter.firstName,
+          subject: 'Interview Scheduled',
+          content: emailContent,
+        }),
+      });
+    } catch (emailError) {
+      console.error('Failed to send email to recruiter:', emailError.message);
+    }
+  })();
 
   res.status(StatusCodes.CREATED).json({
     success: true,
@@ -213,13 +329,17 @@ const getAllInterviews = asyncHandler(async (req, res) => {
     }
     // Recruiters can see interviews for their jobs
     else if (user.isRecruiter && !user.isAdmin) {
+      query.recruiterId = user.id; // Simplified: use recruiterId field directly
+      // Also include jobs they own for backward compatibility
       const recruiterJobs = await Job.find({ recruiterId: user.id }).select('_id');
       const recruiterJobIds = recruiterJobs.map(job => job._id.toString());
       if (recruiterJobIds.length > 0) {
-        query.jobId = { $in: recruiterJobIds };
+        query.$or = [
+          { recruiterId: user.id },
+          { jobId: { $in: recruiterJobIds } }
+        ];
       } else {
-        // No jobs = no interviews
-        query.jobId = { $in: [] };
+        query.recruiterId = user.id;
       }
     }
     // Admins can see all interviews (no filter)
@@ -230,7 +350,11 @@ const getAllInterviews = asyncHandler(async (req, res) => {
   }
 
   if (scheduledTime) {
-    query.scheduledTime = { $gte: new Date(scheduledTime) };
+    const dateTime = new Date(scheduledTime);
+    query.$or = [
+      { scheduledDateTime: { $gte: dateTime } },
+      { scheduledTime: { $gte: dateTime } }
+    ];
   }
 
   // Override interviewerId filter if user is interviewer (already set above)
@@ -489,19 +613,29 @@ const updateInterview = asyncHandler(async (req, res) => {
     throw new Error('Interview not found.');
   }
 
-  // Role-based access control: Interviewers can ONLY update interviews assigned to them
+  // SIMPLIFIED: Role-based access control - allow recruiters, interviewers, and admins
   const user = req.user;
-  if (user.isInterviewer && !user.isAdmin) {
-    if (interview.interviewerId._id.toString() !== user.id.toString()) {
-      res.status(StatusCodes.FORBIDDEN);
-      throw new Error('You do not have permission to update this interview.');
+  let hasPermission = false;
+
+  if (user.isAdmin) {
+    hasPermission = true;
+  } else if (user.isRecruiter && !user.isAdmin) {
+    // Recruiters can update interviews they created or for their jobs
+    const recruiterId = interview.recruiterId?._id?.toString() || interview.recruiterId?.toString();
+    const jobRecruiterId = interview.jobId?.recruiterId?._id?.toString() || interview.jobId?.recruiterId?.toString();
+    if (recruiterId === user.id.toString() || jobRecruiterId === user.id.toString()) {
+      hasPermission = true;
+    }
+  } else if (user.isInterviewer && !user.isAdmin) {
+    // Interviewers can update interviews assigned to them
+    const interviewerId = interview.interviewerId?._id?.toString() || interview.interviewerId?.toString();
+    if (interviewerId === user.id.toString()) {
+      hasPermission = true;
     }
   }
-  // Admins can update any interview
-  if (user.isAdmin || interview.interviewerId._id.toString() === user.id.toString()) {
-    // User has permission
-  } else {
-    res.status(StatusCodes.UNAUTHORIZED);
+
+  if (!hasPermission) {
+    res.status(StatusCodes.FORBIDDEN);
     throw new Error('You do not have permission to update this interview.');
   }
 
@@ -611,12 +745,31 @@ const deleteInterview = asyncHandler(async (req, res) => {
     throw new Error('Interview not found.');
   }
 
-  // Check if user has permission to delete
-  if (req.user.isAdmin || interview.interviewerId._id.toString() === req.user.id) {
-    // User has permission
-  } else {
-    res.status(StatusCodes.UNAUTHORIZED);
-    throw new Error('You do not have permission to delete this interview.');
+  // SIMPLIFIED: Role-based access control - allow recruiters, interviewers, and admins
+  const user = req.user;
+  let hasPermission = false;
+
+  if (user.isAdmin) {
+    hasPermission = true;
+  } else if (user.isRecruiter && !user.isAdmin) {
+    // Recruiters can cancel interviews they created or for their jobs
+    const recruiterId = interview.recruiterId?._id?.toString() || interview.recruiterId?.toString();
+    const job = await Job.findById(interview.jobId?._id || interview.jobId);
+    const jobRecruiterId = job?.recruiterId?.toString();
+    if (recruiterId === user.id.toString() || jobRecruiterId === user.id.toString()) {
+      hasPermission = true;
+    }
+  } else if (user.isInterviewer && !user.isAdmin) {
+    // Interviewers can cancel interviews assigned to them
+    const interviewerId = interview.interviewerId?._id?.toString() || interview.interviewerId?.toString();
+    if (interviewerId === user.id.toString()) {
+      hasPermission = true;
+    }
+  }
+
+  if (!hasPermission) {
+    res.status(StatusCodes.FORBIDDEN);
+    throw new Error('You do not have permission to cancel this interview.');
   }
 
   const deletedInterview = await Interview.findByIdAndDelete(req.params.id);

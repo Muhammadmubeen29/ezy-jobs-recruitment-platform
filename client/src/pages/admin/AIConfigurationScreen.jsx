@@ -205,15 +205,15 @@ export default function AIManagementScreen() {
     <>
       <Helmet>
         <title>
-          AI Configuration [Admin] - OptaHire | Manage AI Recruitment Models
+          AI Configuration [Admin] - EZYJOBS | Manage AI Recruitment Models
         </title>
         <meta
           name="description"
-          content="OptaHire AI Configuration - Configure and manage AI recruitment models, train algorithms, and optimize candidate matching systems."
+          content="EZYJOBS AI Configuration - Configure and manage AI recruitment models, train algorithms, and optimize candidate matching systems."
         />
         <meta
           name="keywords"
-          content="OptaHire AI Configuration, AI Recruitment, Machine Learning, Candidate Matching, AI Training"
+          content="EZYJOBS AI Configuration, AI Recruitment, Machine Learning, Candidate Matching, AI Training"
         />
       </Helmet>
 

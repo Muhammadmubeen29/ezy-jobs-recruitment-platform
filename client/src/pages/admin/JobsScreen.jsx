@@ -206,15 +206,15 @@ export default function JobsScreen() {
     <>
       <Helmet>
         <title>
-          Job Management [Admin] - OptaHire | Monitor All Job Postings
+          Job Management [Admin] - EZYJOBS | Monitor All Job Postings
         </title>
         <meta
           name="description"
-          content="OptaHire Job Management - Monitor and manage all job postings across the platform. Ensure quality and compliance."
+          content="EZYJOBS Job Management - Monitor and manage all job postings across the platform. Ensure quality and compliance."
         />
         <meta
           name="keywords"
-          content="OptaHire Job Management, Admin Jobs, Job Postings, Recruitment Admin, Job Monitoring"
+          content="EZYJOBS Job Management, Admin Jobs, Job Postings, Recruitment Admin, Job Monitoring"
         />
       </Helmet>
 

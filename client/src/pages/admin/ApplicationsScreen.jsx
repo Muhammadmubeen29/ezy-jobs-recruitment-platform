@@ -206,15 +206,15 @@ export default function ApplicationsScreen() {
     <>
       <Helmet>
         <title>
-          Applications Management [Admin] - OptaHire | Monitor All Applications
+          Applications Management [Admin] - EZYJOBS | Monitor All Applications
         </title>
         <meta
           name="description"
-          content="OptaHire Admin Applications Management - Track and monitor all candidate applications across the platform efficiently."
+          content="EZYJOBS Admin Applications Management - Track and monitor all candidate applications across the platform efficiently."
         />
         <meta
           name="keywords"
-          content="OptaHire Admin Applications, Application Management, Recruitment Tracking, Candidate Applications"
+          content="EZYJOBS Admin Applications, Application Management, Recruitment Tracking, Candidate Applications"
         />
       </Helmet>
 

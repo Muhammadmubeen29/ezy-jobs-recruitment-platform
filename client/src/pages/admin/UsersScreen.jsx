@@ -347,15 +347,15 @@ export default function UsersScreen() {
     <>
       <Helmet>
         <title>
-          User Management [Admin] - OptaHire | Manage Platform Users
+          User Management [Admin] - EZYJOBS | Manage Platform Users
         </title>
         <meta
           name="description"
-          content="OptaHire User Management - Efficiently manage recruiters, candidates, and interviewers. Control user permissions and platform access."
+          content="EZYJOBS User Management - Efficiently manage recruiters, candidates, and interviewers. Control user permissions and platform access."
         />
         <meta
           name="keywords"
-          content="OptaHire User Management, Admin Users, Recruitment Platform, User Control, Account Management"
+          content="EZYJOBS User Management, Admin Users, Recruitment Platform, User Control, Account Management"
         />
       </Helmet>
 

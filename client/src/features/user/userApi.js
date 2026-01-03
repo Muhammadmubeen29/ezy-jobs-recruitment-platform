@@ -13,6 +13,7 @@ const ENDPOINTS = {
   DELETE_USER_PERMANENT: (id) => `/users/${id}/permanent`,
   VERIFY_EMAIL: '/users/verify-email',
   UPDATE_PASSWORD: '/users/update-password',
+  GET_INTERVIEWERS: '/users/interviewers',
 };
 
 export const userApi = createApi({
@@ -95,6 +96,13 @@ export const userApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+    getInterviewers: builder.query({
+      query: () => ({
+        url: ENDPOINTS.GET_INTERVIEWERS,
+        method: 'GET',
+      }),
+      providesTags: ['User'],
+    }),
   }),
 });
 
@@ -109,4 +117,5 @@ export const {
   useDeleteUserPermanentMutation,
   useVerifyEmailMutation,
   useUpdatePasswordMutation,
+  useGetInterviewersQuery,
 } = userApi;

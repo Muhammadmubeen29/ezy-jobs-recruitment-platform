@@ -10,8 +10,31 @@ export const axiosBaseQuery =
       // CRASH CAUSE: Empty Authorization header can cause backend to reject requests
       // SOLUTION: Only include Authorization header when accessToken is truthy and non-empty
       const requestHeaders = { ...headers };
-      if (accessToken && typeof accessToken === 'string' && accessToken.trim() !== '') {
-        requestHeaders.Authorization = `Bearer ${accessToken.trim()}`;
+      
+      // Handle token that might be stored as JSON string
+      let tokenValue = accessToken;
+      if (tokenValue && typeof tokenValue !== 'string') {
+        // If token is an object or other type, try to stringify it
+        tokenValue = String(tokenValue);
+      }
+      
+      // Remove quotes if token was double-stringified (stored as JSON string)
+      if (tokenValue && tokenValue.startsWith('"') && tokenValue.endsWith('"')) {
+        try {
+          tokenValue = JSON.parse(tokenValue);
+        } catch {
+          // If parsing fails, use the value as-is after removing quotes manually
+          tokenValue = tokenValue.slice(1, -1);
+        }
+      }
+      
+      if (tokenValue && typeof tokenValue === 'string' && tokenValue.trim() !== '') {
+        requestHeaders.Authorization = `Bearer ${tokenValue.trim()}`;
+      } else {
+        // Debug: Log when token is missing (only in development)
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ No access token found for request:', url);
+        }
       }
 
       const result = await axiosInstance({

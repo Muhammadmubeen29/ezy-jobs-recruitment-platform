@@ -261,15 +261,15 @@ export default function TransactionsScreen() {
     <>
       <Helmet>
         <title>
-          Transaction Management [Admin] - OptaHire | Monitor All Payments
+          Transaction Management [Admin] - EZYJOBS | Monitor All Payments
         </title>
         <meta
           name="description"
-          content="OptaHire Transaction Management - Monitor all platform transactions, payments, and financial activities with detailed analytics."
+          content="EZYJOBS Transaction Management - Monitor all platform transactions, payments, and financial activities with detailed analytics."
         />
         <meta
           name="keywords"
-          content="OptaHire Transaction Management, Payment Monitoring, Financial Analytics, Admin Transactions"
+          content="EZYJOBS Transaction Management, Payment Monitoring, Financial Analytics, Admin Transactions"
         />
       </Helmet>
 

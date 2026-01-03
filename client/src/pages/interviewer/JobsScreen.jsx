@@ -221,14 +221,14 @@ export default function JobsScreen() {
   return (
     <>
       <Helmet>
-        <title>Available Jobs - OptaHire | Find Interview Opportunities</title>
+        <title>Available Jobs - EZYJOBS | Find Interview Opportunities</title>
         <meta
           name="description"
-          content="Discover interview opportunities on OptaHire. Browse jobs seeking expert interviewers and grow your freelance business."
+          content="Discover interview opportunities on EZYJOBS. Browse jobs seeking expert interviewers and grow your freelance business."
         />
         <meta
           name="keywords"
-          content="OptaHire Interviewer Jobs, Interview Opportunities, Freelance Interviewing, Interview Gigs, Interviewer Marketplace"
+          content="EZYJOBS Interviewer Jobs, Interview Opportunities, Freelance Interviewing, Interview Gigs, Interviewer Marketplace"
         />
       </Helmet>
 

@@ -837,14 +837,14 @@ export default function ChatsScreen() {
   return (
     <>
       <Helmet>
-        <title>Messages - OptaHire | Connect with Top Interviewers</title>
+        <title>Messages - EZYJOBS | Connect with Top Interviewers</title>
         <meta
           name="description"
-          content="Connect with professional interviewers on OptaHire. Discuss requirements, negotiate contracts, and streamline your hiring process."
+          content="Connect with professional interviewers on EZYJOBS. Discuss requirements, negotiate contracts, and streamline your hiring process."
         />
         <meta
           name="keywords"
-          content="OptaHire Recruiter Messages, Interviewer Communication, Professional Interviews, Contract Negotiations, Hiring Support"
+          content="EZYJOBS Recruiter Messages, Interviewer Communication, Professional Interviews, Contract Negotiations, Hiring Support"
         />
       </Helmet>
 

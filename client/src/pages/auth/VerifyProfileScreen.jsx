@@ -110,14 +110,14 @@ function VerifyProfileScreen() {
   return (
     <>
       <Helmet>
-        <title>Verify Account - OptaHire | Complete Account Setup</title>
+        <title>Verify Account - EZYJOBS | Complete Account Setup</title>
         <meta
           name="description"
-          content="Verify your OptaHire account to unlock full platform features. Complete your secure account verification process."
+          content="Verify your EZYJOBS account to unlock full platform features. Complete your secure account verification process."
         />
         <meta
           name="keywords"
-          content="OptaHire Verify Account, Account Verification, Complete Setup, Secure Verification"
+          content="EZYJOBS Verify Account, Account Verification, Complete Setup, Secure Verification"
         />
       </Helmet>
 
@@ -145,7 +145,7 @@ function VerifyProfileScreen() {
               </span>
             </h1>
             <p className="mb-8 text-center text-lg text-light-text/70 dark:text-dark-text/70">
-              Complete your account verification to unlock all OptaHire features
+              Complete your account verification to unlock all EZYJOBS features
               and start your recruitment journey.
             </p>
 

@@ -958,6 +958,43 @@ const deleteUserPermById = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc Get all interviewers (Simple endpoint for recruiters)
+ *
+ * @route GET /api/v1/users/interviewers
+ * @access Private (Recruiter, Admin)
+ *
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ *
+ * @returns {Promise<void>}
+ */
+
+const getInterviewers = asyncHandler(async (req, res) => {
+  // Find all users who are interviewers
+  const interviewers = await User.find({ isInterviewer: true })
+    .select('firstName lastName email phone isVerified isTopRated')
+    .sort({ lastName: 1, firstName: 1 }); // Sort alphabetically by name
+
+  if (!interviewers || interviewers.length === 0) {
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'No interviewers found.',
+      count: 0,
+      interviewers: [],
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: `Found ${interviewers.length} interviewer${interviewers.length === 1 ? '' : 's'}.`,
+    count: interviewers.length,
+    interviewers,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 module.exports = {
   verifyUserEmail,
   updateUserPassword,
@@ -969,4 +1006,5 @@ module.exports = {
   updateUserProfileById,
   deleteUserById,
   deleteUserPermById,
+  getInterviewers,
 };

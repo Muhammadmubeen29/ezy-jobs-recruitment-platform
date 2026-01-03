@@ -94,14 +94,14 @@ function LoginScreen() {
   return (
     <>
       <Helmet>
-        <title>Login - OptaHire | Access Your Recruitment Account</title>
+        <title>Login - EZYJOBS | Access Your Recruitment Account</title>
         <meta
           name="description"
-          content="Login to OptaHire - Access your recruitment dashboard as a recruiter, candidate, or interviewer. Secure authentication for all users."
+          content="Login to EZYJOBS - Access your recruitment dashboard as a recruiter, candidate, or interviewer. Secure authentication for all users."
         />
         <meta
           name="keywords"
-          content="OptaHire Login, Recruitment Login, Secure Access, User Authentication, Account Access"
+          content="EZYJOBS Login, Recruitment Login, Secure Access, User Authentication, Account Access"
         />
       </Helmet>
       <section className="flex min-h-screen animate-fadeIn flex-col items-center bg-light-background px-4 py-14 dark:bg-dark-background">
@@ -127,7 +127,7 @@ function LoginScreen() {
             </h1>
             <p className="mb-8 text-center text-lg text-light-text/70 dark:text-dark-text/70">
               Sign in to your account and continue optimizing your recruitment
-              journey with OptaHire.
+              journey with EZYJOBS.
             </p>
 
             {error && <Alert message={error.data.message} />}

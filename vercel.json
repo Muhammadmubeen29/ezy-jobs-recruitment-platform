@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "builds": [],
+  "routes": [],
+  "comment": "This is a monorepo. Deploy client and server as separate Vercel projects. See VERCEL_DEPLOYMENT.md for instructions."
+}
+

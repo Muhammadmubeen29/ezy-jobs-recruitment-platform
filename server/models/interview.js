@@ -3,19 +3,19 @@
 const mongoose = require('mongoose');
 
 const interviewSchema = new mongoose.Schema({
+  // SIMPLIFIED: Made roomId optional for future WebRTC integration
   roomId: {
     type: String,
-    required: [true, 'Room ID is required'],
     unique: true,
+    sparse: true, // Allow multiple null values
     trim: true,
   },
+  // Legacy field - keep for backward compatibility
   scheduledTime: {
     type: Date,
-    required: [true, 'Scheduled time is required'],
     validate: {
       validator: function(value) {
         // Only validate future dates when creating a new scheduled interview
-        // Allow any date for completed/cancelled interviews or updates
         if (this.isNew && this.status === 'scheduled') {
           return value > new Date();
         }
@@ -24,29 +24,51 @@ const interviewSchema = new mongoose.Schema({
       message: 'Scheduled time must be in the future when creating a new scheduled interview',
     },
   },
-  callStartedAt: {
+  // New simplified fields
+  scheduledDate: {
     type: Date,
+  },
+  scheduledTimeString: {
+    type: String,
     validate: {
       validator: function(value) {
-        if (value && this.scheduledTime && value < this.scheduledTime) {
-          return false;
-        }
-        return true;
+        if (!value) return true; // Optional
+        // Validate time format (HH:mm)
+        return /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(value);
       },
-      message: 'Call start time cannot be before scheduled time',
+      message: 'Time must be in HH:mm format (e.g., 14:30)',
     },
   },
-  callEndedAt: {
+  // Combined scheduled date + time for sorting/querying
+  scheduledDateTime: {
     type: Date,
     validate: {
       validator: function(value) {
-        if (value && this.callStartedAt && value <= this.callStartedAt) {
-          return false;
+        // Only validate future dates when creating a new scheduled interview
+        if (this.isNew && this.status === 'scheduled') {
+          return value > new Date();
         }
         return true;
       },
-      message: 'Call end time must be after call start time',
+      message: 'Interview must be scheduled for a future date and time',
     },
+  },
+  meetingType: {
+    type: String,
+    enum: {
+      values: ['Online', 'On-site', 'Phone'],
+      message: 'Meeting type must be one of: Online, On-site, Phone',
+    },
+    default: 'Online',
+  },
+  notes: {
+    type: String,
+    trim: true,
+    maxlength: [1000, 'Notes must not exceed 1000 characters'],
+  },
+  recruiterId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
   interviewerId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -72,8 +94,34 @@ const interviewSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Status is required'],
     enum: {
-      values: ['scheduled', 'ongoing', 'completed', 'cancelled'],
-      message: 'Status must be one of: scheduled, ongoing, completed, cancelled',
+      values: ['scheduled', 'rescheduled', 'cancelled', 'completed'],
+      message: 'Status must be one of: scheduled, rescheduled, cancelled, completed',
+    },
+    default: 'scheduled',
+  },
+  // WebRTC specific fields (optional, for future use)
+  callStartedAt: {
+    type: Date,
+    validate: {
+      validator: function(value) {
+        if (value && this.scheduledDateTime && value < this.scheduledDateTime) {
+          return false;
+        }
+        return true;
+      },
+      message: 'Call start time cannot be before scheduled time',
+    },
+  },
+  callEndedAt: {
+    type: Date,
+    validate: {
+      validator: function(value) {
+        if (value && this.callStartedAt && value <= this.callStartedAt) {
+          return false;
+        }
+        return true;
+      },
+      message: 'Call end time must be after call start time',
     },
   },
   remarks: {
@@ -98,12 +146,13 @@ const interviewSchema = new mongoose.Schema({
 });
 
 // Index for better query performance
+interviewSchema.index({ recruiterId: 1 });
 interviewSchema.index({ interviewerId: 1 });
 interviewSchema.index({ candidateId: 1 });
 interviewSchema.index({ jobId: 1 });
 interviewSchema.index({ applicationId: 1 });
 interviewSchema.index({ status: 1 });
-interviewSchema.index({ scheduledTime: 1 });
+interviewSchema.index({ scheduledDateTime: 1 });
 
 const Interview = mongoose.model('Interview', interviewSchema);
 

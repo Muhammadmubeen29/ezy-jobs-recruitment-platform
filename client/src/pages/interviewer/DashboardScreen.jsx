@@ -253,15 +253,15 @@ export default function DashboardScreen() {
     <>
       <Helmet>
         <title>
-          Interviewer Dashboard - OptaHire | Manage Your Interview Business
+          Interviewer Dashboard - EZYJOBS | Manage Your Interview Business
         </title>
         <meta
           name="description"
-          content="OptaHire Interviewer Dashboard - Manage your interview schedule, contracts, earnings, and grow your interviewing business."
+          content="EZYJOBS Interviewer Dashboard - Manage your interview schedule, contracts, earnings, and grow your interviewing business."
         />
         <meta
           name="keywords"
-          content="OptaHire Interviewer Dashboard, Interview Business, Freelance Interviewing, Interview Contracts, Earnings"
+          content="EZYJOBS Interviewer Dashboard, Interview Business, Freelance Interviewing, Interview Contracts, Earnings"
         />
       </Helmet>
 

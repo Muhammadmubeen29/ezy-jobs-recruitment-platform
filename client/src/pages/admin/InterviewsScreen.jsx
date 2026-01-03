@@ -204,15 +204,15 @@ export default function InterviewsScreen() {
     <>
       <Helmet>
         <title>
-          Interview Management [Admin] - OptaHire | Monitor All Interviews
+          Interview Management [Admin] - EZYJOBS | Monitor All Interviews
         </title>
         <meta
           name="description"
-          content="OptaHire Interview Management - Track all scheduled interviews, monitor progress, and ensure quality interview experiences."
+          content="EZYJOBS Interview Management - Track all scheduled interviews, monitor progress, and ensure quality interview experiences."
         />
         <meta
           name="keywords"
-          content="OptaHire Interview Management, Admin Interviews, Interview Tracking, Recruitment Interviews"
+          content="EZYJOBS Interview Management, Admin Interviews, Interview Tracking, Recruitment Interviews"
         />
       </Helmet>
 

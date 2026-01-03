@@ -194,14 +194,14 @@ export default function FeedbackScreen() {
   return (
     <>
       <Helmet>
-        <title>Interview Feedback - OptaHire | Performance Review</title>
+        <title>Interview Feedback - EZYJOBS | Performance Review</title>
         <meta
           name="description"
-          content="View your interview feedback on OptaHire. Get detailed performance insights and recommendations for improvement."
+          content="View your interview feedback on EZYJOBS. Get detailed performance insights and recommendations for improvement."
         />
         <meta
           name="keywords"
-          content="OptaHire Interview Feedback, Performance Review, Interview Results, Career Development, Interview Assessment"
+          content="EZYJOBS Interview Feedback, Performance Review, Interview Results, Career Development, Interview Assessment"
         />
       </Helmet>
 

@@ -369,15 +369,15 @@ export default function DashboardScreen() {
     <>
       <Helmet>
         <title>
-          Admin Dashboard - OptaHire | Recruitment Platform Analytics
+          Admin Dashboard - EZYJOBS | Recruitment Platform Analytics
         </title>
         <meta
           name="description"
-          content="OptaHire Admin Dashboard - Monitor recruitment metrics, user activity, and platform performance with comprehensive analytics and insights."
+          content="EZYJOBS Admin Dashboard - Monitor recruitment metrics, user activity, and platform performance with comprehensive analytics and insights."
         />
         <meta
           name="keywords"
-          content="OptaHire Admin Dashboard, Recruitment Analytics, Platform Management, Admin Panel, Hiring Metrics"
+          content="EZYJOBS Admin Dashboard, Recruitment Analytics, Platform Management, Admin Panel, Hiring Metrics"
         />
       </Helmet>
 

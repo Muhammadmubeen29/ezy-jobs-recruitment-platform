@@ -120,14 +120,14 @@ export default function RatingsScreen() {
   return (
     <>
       <Helmet>
-        <title>My Ratings - OptaHire | Interview Performance Reviews</title>
+        <title>My Ratings - EZYJOBS | Interview Performance Reviews</title>
         <meta
           name="description"
-          content="View your interview ratings and feedback on OptaHire. Track your performance and build a stellar reputation as an interviewer."
+          content="View your interview ratings and feedback on EZYJOBS. Track your performance and build a stellar reputation as an interviewer."
         />
         <meta
           name="keywords"
-          content="OptaHire Interviewer Ratings, Interview Performance, Feedback Reviews, Professional Reputation, Interview Quality"
+          content="EZYJOBS Interviewer Ratings, Interview Performance, Feedback Reviews, Professional Reputation, Interview Quality"
         />
       </Helmet>
 

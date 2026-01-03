@@ -15,14 +15,14 @@ export default function DashboardScreen() {
   return (
     <>
       <Helmet>
-        <title>Candidate Dashboard - OptaHire | Your Job Search Hub</title>
+        <title>Candidate Dashboard - EZYJOBS | Your Job Search Hub</title>
         <meta
           name="description"
-          content="OptaHire Candidate Dashboard - Track your applications, upcoming interviews, and discover new opportunities with AI-powered matching."
+          content="EZYJOBS Candidate Dashboard - Track your applications, upcoming interviews, and discover new opportunities with AI-powered matching."
         />
         <meta
           name="keywords"
-          content="OptaHire Candidate Dashboard, Job Search, Application Tracking, Interview Schedule, Career Opportunities"
+          content="EZYJOBS Candidate Dashboard, Job Search, Application Tracking, Interview Schedule, Career Opportunities"
         />
       </Helmet>
 
@@ -30,7 +30,7 @@ export default function DashboardScreen() {
         <div className="mx-auto w-full max-w-4xl animate-slideUp rounded-xl bg-light-surface p-8 text-center shadow-lg dark:bg-dark-surface">
           <img
             src={Logo}
-            alt="OptaHire Logo"
+            alt="EZYJOBS Logo"
             className="mx-auto mb-6 h-24 w-24 animate-loader"
           />
           <h1 className="mb-6 text-center text-3xl font-bold text-light-text dark:text-dark-text sm:text-4xl md:text-5xl">

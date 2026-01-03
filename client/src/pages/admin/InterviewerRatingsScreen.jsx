@@ -189,15 +189,15 @@ export default function InterviewerRatingsScreen() {
     <>
       <Helmet>
         <title>
-          Interviewer Ratings [Admin] - OptaHire | Monitor Interview Quality
+          Interviewer Ratings [Admin] - EZYJOBS | Monitor Interview Quality
         </title>
         <meta
           name="description"
-          content="OptaHire Interviewer Ratings - Monitor and manage interviewer performance ratings to maintain high-quality interview standards."
+          content="EZYJOBS Interviewer Ratings - Monitor and manage interviewer performance ratings to maintain high-quality interview standards."
         />
         <meta
           name="keywords"
-          content="OptaHire Interviewer Ratings, Interview Quality, Performance Management, Admin Ratings"
+          content="EZYJOBS Interviewer Ratings, Interview Quality, Performance Management, Admin Ratings"
         />
       </Helmet>
 

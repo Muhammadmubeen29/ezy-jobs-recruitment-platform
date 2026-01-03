@@ -2,11 +2,11 @@
   "is_trained": true,
   "training_metadata": {
     "model_version": "1.0.0",
-    "training_samples": 200,
-    "valid_samples": 200,
-    "vocabulary_size": 1000,
-    "skills_vocabulary_size": 500,
-    "training_timestamp": "2025-11-29T07:23:41.319004+00:00",
+    "training_samples": 44,
+    "valid_samples": 44,
+    "vocabulary_size": 229,
+    "skills_vocabulary_size": 222,
+    "training_timestamp": "2026-01-01T21:51:15.735060+00:00",
     "weights": {
       "skills_match": 0.4,
       "experience_relevance": 0.3,
@@ -20,6 +20,6 @@
     "text_vectorizer": "text_vectorizer.pkl",
     "skills_vectorizer": "skills_vectorizer.pkl"
   },
-  "saved_timestamp": "2025-11-29T07:23:41.342583+00:00",
+  "saved_timestamp": "2026-01-01T21:51:15.826943+00:00",
   "model_version": "1.0.0"
 }

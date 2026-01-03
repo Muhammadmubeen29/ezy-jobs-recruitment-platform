@@ -190,14 +190,14 @@ export default function JobsScreen() {
   return (
     <>
       <Helmet>
-        <title>Browse Jobs - OptaHire | AI-Matched Career Opportunities</title>
+        <title>Browse Jobs - EZYJOBS | AI-Matched Career Opportunities</title>
         <meta
           name="description"
-          content="Discover AI-matched job opportunities on OptaHire. Find the perfect career fit with intelligent job recommendations and easy applications."
+          content="Discover AI-matched job opportunities on EZYJOBS. Find the perfect career fit with intelligent job recommendations and easy applications."
         />
         <meta
           name="keywords"
-          content="OptaHire Jobs, Job Search, AI Job Matching, Career Opportunities, Job Applications"
+          content="EZYJOBS Jobs, Job Search, AI Job Matching, Career Opportunities, Job Applications"
         />
       </Helmet>
 

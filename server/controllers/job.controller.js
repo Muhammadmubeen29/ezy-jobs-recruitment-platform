@@ -753,9 +753,13 @@ const updateJobById = asyncHandler(async (req, res) => {
 
 /**
  * @desc Deletes the job with the specified ID.
+ * 
+ * NOTE: This function PERMANENTLY DELETES the job from the database.
+ * To close a job (prevent new applications while keeping the job visible),
+ * use updateJobById with isClosed: true instead.
  *
  * @route DELETE /api/v1/jobs/:id
- * @access Private (Admin)
+ * @access Private (Recruiter, Admin)
  *
  * @param {Object} req - The request object.
  * @param {Object} res - The response object.

@@ -219,7 +219,23 @@ const getAllContracts = asyncHandler(async (req, res) => {
     jobId,
     limit,
   } = req.query;
+  const user = req.user;
   let query = {};
+
+  // FIXED: Add role-based filtering for contracts
+  // CRASH CAUSE: Recruiters and interviewers could see all contracts
+  // SOLUTION: Filter contracts based on user role
+  if (user) {
+    // Recruiters can ONLY see their own contracts
+    if (user.isRecruiter && !user.isAdmin) {
+      query.recruiterId = user.id;
+    }
+    // Interviewers can ONLY see contracts assigned to them
+    else if (user.isInterviewer && !user.isRecruiter && !user.isAdmin) {
+      query.interviewerId = user.id;
+    }
+    // Admins can see all contracts (no additional filter)
+  }
 
   if (search) {
     query.$or = [
@@ -230,8 +246,13 @@ const getAllContracts = asyncHandler(async (req, res) => {
 
   if (status) query.status = { $regex: status, $options: 'i' };
   if (paymentStatus) query.paymentStatus = { $regex: paymentStatus, $options: 'i' };
-  if (recruiterId) query.recruiterId = recruiterId;
-  if (interviewerId) query.interviewerId = interviewerId;
+  // Only allow manual filters for admins or if matching user's own ID
+  if (recruiterId && (user?.isAdmin || (user?.isRecruiter && recruiterId === user.id.toString()))) {
+    query.recruiterId = recruiterId;
+  }
+  if (interviewerId && (user?.isAdmin || (user?.isInterviewer && interviewerId === user.id.toString()))) {
+    query.interviewerId = interviewerId;
+  }
   if (jobId) query.jobId = jobId;
 
   const contracts = await Contract.find(query)

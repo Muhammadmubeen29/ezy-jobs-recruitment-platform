@@ -16,6 +16,7 @@ const {
   updateUserProfileById,
   deleteUserById,
   deleteUserPermById,
+  getInterviewers,
 } = require('../controllers/user.controller');
 
 const router = Router();
@@ -27,6 +28,11 @@ router
 router.route('/verify-email').post(protectServer, verifyUserEmail);
 
 router.route('/update-password').put(protectServer, updateUserPassword);
+
+// Simple endpoint for recruiters to get interviewers
+router
+  .route('/interviewers')
+  .get(protectServer, authorizeServerRoles('isRecruiter', 'isAdmin'), getInterviewers);
 
 router
   .route('/profile')

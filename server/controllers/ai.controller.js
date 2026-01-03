@@ -358,12 +358,19 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
 
   try {
     // Prepare data for AI service
+    // FIXED: Convert requirements array to string for AI service compatibility
+    // CRASH CAUSE: Python AI service expects requirements as string, but MongoDB stores as array
+    // SOLUTION: Convert array to comma-separated string if needed
+    const requirementsText = Array.isArray(job.requirements) 
+      ? job.requirements.join(', ') 
+      : (job.requirements || '');
+
     const aiRequestData = {
       job: {
         id: job._id,
         title: job.title,
         description: job.description,
-        requirements: job.requirements,
+        requirements: requirementsText,
         category: job.category,
         company: job.company,
         salaryRange: job.salaryRange,
@@ -405,7 +412,21 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
       }
     );
 
-    let shortlistedCandidates = response.data.shortlisted_candidates || [];
+    // FIXED: Add detailed logging to diagnose empty shortlist results
+    // CRASH CAUSE: AI service returning empty shortlisted_candidates array
+    // SOLUTION: Log full response to identify why candidates aren't being shortlisted
+    console.log('AI Service Response:', {
+      status: response.status,
+      success: response.data?.success,
+      message: response.data?.message,
+      shortlistedCount: response.data?.shortlisted_count || response.data?.data?.shortlisted_count || 0,
+      totalApplications: response.data?.total_applications || response.data?.data?.total_applications || 0,
+      validApplications: response.data?.valid_applications || response.data?.data?.valid_applications || 0,
+      shortlistedCandidatesLength: response.data?.shortlisted_candidates?.length || response.data?.data?.shortlisted_candidates?.length || 0,
+      fullResponseKeys: Object.keys(response.data || {}),
+    });
+
+    let shortlistedCandidates = response.data?.shortlisted_candidates || response.data?.data?.shortlisted_candidates || [];
 
     // Get IDs of all applications (that have resumes) for this job to identify the rejected ones
     const allAppIds = applicationsWithResumes.map((app) => app.id);
@@ -433,6 +454,22 @@ const shortlistCandidates = asyncHandler(async (req, res) => {
           { _id: { $in: shortlistedAppIds } },
           { $set: { status: 'shortlisted' } }
         );
+
+        // Create pre-assessments for shortlisted candidates (extension - post-shortlisting hook)
+        const { createAssessmentForApplication } = require('../services/assessment.service');
+        const preAssessmentPromises = shortlistedAppIds.map(async (appId) => {
+          try {
+            // Create assessment in background - don't block shortlisting if it fails
+            await createAssessmentForApplication(appId, 60);
+            console.log(`✅ Pre-assessment created for application ${appId}`);
+          } catch (error) {
+            console.error(`⚠️ Failed to create pre-assessment for application ${appId}:`, error.message);
+            // Don't throw - allow shortlisting to succeed even if assessment creation fails
+          }
+        });
+        
+        // Wait for all assessments to be created, but don't fail if some fail
+        await Promise.allSettled(preAssessmentPromises);
       }
 
       // Update rejected applications status (Mongoose)

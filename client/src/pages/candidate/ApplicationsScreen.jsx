@@ -90,14 +90,14 @@ export default function CandidateApplicationsScreen() {
   return (
     <>
       <Helmet>
-        <title>My Applications - OptaHire | Track Application Status</title>
+        <title>My Applications - EZYJOBS | Track Application Status</title>
         <meta
           name="description"
-          content="Track all your job applications on OptaHire. Monitor application status, interview schedules, and hiring progress in real-time."
+          content="Track all your job applications on EZYJOBS. Monitor application status, interview schedules, and hiring progress in real-time."
         />
         <meta
           name="keywords"
-          content="OptaHire My Applications, Application Status, Job Tracking, Application History, Interview Status"
+          content="EZYJOBS My Applications, Application Status, Job Tracking, Application History, Interview Status"
         />
       </Helmet>
 

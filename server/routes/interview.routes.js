@@ -18,18 +18,21 @@ const router = Router();
 
 router
   .route('/')
-  .post(protectServer, authorizeServerRoles('isInterviewer'), createInterview)
+  // SIMPLIFIED: Allow both recruiters and interviewers to create interviews
+  .post(protectServer, authorizeServerRoles('isRecruiter', 'isInterviewer'), createInterview)
   .get(protectServer, getAllInterviews);
 
 router
   .route('/:id')
   .get(protectServer, getInterviewById)
+  // SIMPLIFIED: Allow recruiters, interviewers, and admins to update interviews
   .put(
     protectServer,
-    authorizeServerRoles('isInterviewer', 'isAdmin'),
+    authorizeServerRoles('isRecruiter', 'isInterviewer', 'isAdmin'),
     updateInterview
   )
-  .delete(protectServer, authorizeServerRoles('isAdmin'), deleteInterview);
+  // SIMPLIFIED: Allow recruiters, interviewers, and admins to cancel interviews
+  .delete(protectServer, authorizeServerRoles('isRecruiter', 'isInterviewer', 'isAdmin'), deleteInterview);
 
 router
   .route('/job/:jobId')

@@ -36,6 +36,8 @@ import CandidateApplyScreen from './pages/candidate/ApplyScreen.jsx';
 import CandidateDashboardScreen from './pages/candidate/DashboardScreen.jsx';
 import CandidateInterviewsScreen from './pages/candidate/InterviewsScreen.jsx';
 import CandidateJobsScreen from './pages/candidate/JobsScreen.jsx';
+import AssessmentScreen from './pages/assessment/AssessmentScreen.jsx';
+import AssessmentResultsScreen from './pages/assessment/AssessmentResultsScreen.jsx';
 
 import FeedbackScreen from './pages/interview/FeedbackScreen.jsx';
 import InterviewScreen from './pages/interview/InterviewScreen.jsx';
@@ -155,6 +157,20 @@ const router = createBrowserRouter(
         />
         <Route path="applications" element={<CandidateApplicationsScreen />} />
         <Route path="interviews" element={<CandidateInterviewsScreen />} />
+      </Route>
+
+      <Route
+        path="assessment"
+        element={
+          <RequireAuth>
+            <RequireRole allowedRoles={['candidate', 'recruiter', 'admin']}>
+              <MainLayout />
+            </RequireRole>
+          </RequireAuth>
+        }
+      >
+        <Route path=":id" element={<AssessmentScreen />} />
+        <Route path=":id/results" element={<AssessmentResultsScreen />} />
       </Route>
 
       <Route

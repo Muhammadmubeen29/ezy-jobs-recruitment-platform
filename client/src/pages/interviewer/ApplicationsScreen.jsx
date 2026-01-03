@@ -174,15 +174,15 @@ export default function ApplicationsScreen() {
     <>
       <Helmet>
         <title>
-          Review Applications - OptaHire | AI-Shortlisted Candidates
+          Review Applications - EZYJOBS | AI-Shortlisted Candidates
         </title>
         <meta
           name="description"
-          content="Review AI-shortlisted candidate applications on OptaHire. Access top-quality candidates for efficient interview processes."
+          content="Review AI-shortlisted candidate applications on EZYJOBS. Access top-quality candidates for efficient interview processes."
         />
         <meta
           name="keywords"
-          content="OptaHire Review Applications, AI Shortlisted Candidates, Interview Candidates, Candidate Review, Quality Candidates"
+          content="EZYJOBS Review Applications, AI Shortlisted Candidates, Interview Candidates, Candidate Review, Quality Candidates"
         />
       </Helmet>
 

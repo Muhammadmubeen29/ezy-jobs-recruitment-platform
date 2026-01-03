@@ -389,14 +389,14 @@ export default function ApplyScreen() {
   return (
     <>
       <Helmet>
-        <title>Apply for Position - OptaHire | Submit Your Application</title>
+        <title>Apply for Position - EZYJOBS | Submit Your Application</title>
         <meta
           name="description"
-          content="Apply to exciting career opportunities on OptaHire. Submit your application with AI-powered profile matching for better results."
+          content="Apply to exciting career opportunities on EZYJOBS. Submit your application with AI-powered profile matching for better results."
         />
         <meta
           name="keywords"
-          content="OptaHire Apply Job, Job Application, Career Application, Submit Resume, Job Opportunity"
+          content="EZYJOBS Apply Job, Job Application, Career Application, Submit Resume, Job Opportunity"
         />
       </Helmet>
 

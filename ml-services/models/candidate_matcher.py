@@ -469,17 +469,28 @@ class CandidateMatcher:
             # Score each candidate against the job requirements
             candidate_scores = []
 
-            for application in applications:
+            # FIXED: Add detailed logging to diagnose scoring failures
+            # CRASH CAUSE: All candidates failing to score silently
+            # SOLUTION: Log each scoring attempt and capture exceptions with full details
+            logging.info(f"📊 Starting to score {len(applications)} candidates")
+            
+            for idx, application in enumerate(applications):
                 try:
+                    logging.debug(f"Scoring candidate {idx + 1}/{len(applications)}: {application.get('candidate', {}).get('firstName', 'Unknown')}")
                     score_result = self._calculate_candidate_score(
                         job_data, application
                     )
+                    logging.debug(f"✅ Candidate {idx + 1} scored: {score_result.get('total_score', 0):.3f}")
                     candidate_scores.append(score_result)
                 except Exception as e:
-                    logging.warning(
-                        f"⚠️ Failed to score candidate {application.get('candidateId', 'Unknown')}: {str(e)}"
+                    logging.error(
+                        f"⚠️ Failed to score candidate {idx + 1} ({application.get('candidateId', 'Unknown')}): {str(e)}"
                     )
+                    import traceback
+                    logging.error(f"Full traceback: {traceback.format_exc()}")
                     continue
+            
+            logging.info(f"📊 Successfully scored {len(candidate_scores)}/{len(applications)} candidates")
 
             # Sort candidates by total score (highest first)
             candidate_scores.sort(key=lambda x: x["total_score"], reverse=True)
@@ -527,8 +538,17 @@ class CandidateMatcher:
         scores = {}
 
         # 1. Skills Matching (Most Important - configurable%)
+        # FIXED: Handle requirements as both string and array
+        # CRASH CAUSE: Requirements might be array, but _calculate_skills_match expects string
+        # SOLUTION: Convert to string if array
+        requirements = job_data.get("requirements", "")
+        if isinstance(requirements, list):
+            requirements = ", ".join([str(r) for r in requirements])
+        else:
+            requirements = str(requirements) if requirements else ""
+        
         scores["skills_match"] = self._calculate_skills_match(
-            job_data.get("requirements", ""), resume.get("skills", [])
+            requirements, resume.get("skills", [])
         )
 
         # 2. Experience Relevance (Very Important - configurable%)
@@ -537,8 +557,15 @@ class CandidateMatcher:
         )
 
         # 3. Education Alignment (Important - configurable%)
+        # FIXED: Handle requirements as both string and array
+        requirements_for_edu = job_data.get("requirements", "")
+        if isinstance(requirements_for_edu, list):
+            requirements_for_edu = ", ".join([str(r) for r in requirements_for_edu])
+        else:
+            requirements_for_edu = str(requirements_for_edu) if requirements_for_edu else ""
+        
         scores["education_alignment"] = self._calculate_education_alignment(
-            job_data.get("requirements", ""), resume.get("education", "")
+            requirements_for_edu, resume.get("education", "")
         )
 
         # 4. Industry Experience (Helpful - configurable%)
@@ -831,13 +858,20 @@ class CandidateMatcher:
         text_parts = []
 
         if job_data.get("title"):
-            text_parts.append(job_data["title"])
+            text_parts.append(str(job_data["title"]))
         if job_data.get("description"):
-            text_parts.append(job_data["description"])
+            text_parts.append(str(job_data["description"]))
         if job_data.get("requirements"):
-            text_parts.append(job_data["requirements"])
+            # FIXED: Handle requirements as both string and array
+            # CRASH CAUSE: Requirements might be array from MongoDB, but code expects string
+            # SOLUTION: Convert array to string if needed
+            requirements = job_data["requirements"]
+            if isinstance(requirements, list):
+                text_parts.append(", ".join([str(r) for r in requirements]))
+            else:
+                text_parts.append(str(requirements))
         if job_data.get("category"):
-            text_parts.append(job_data["category"])
+            text_parts.append(str(job_data["category"]))
 
         return " ".join(text_parts)
 

@@ -233,15 +233,15 @@ export default function ContractsScreen() {
     <>
       <Helmet>
         <title>
-          Contract Management [Admin] - OptaHire | Monitor Interviewer Contracts
+          Contract Management [Admin] - EZYJOBS | Monitor Interviewer Contracts
         </title>
         <meta
           name="description"
-          content="OptaHire Contract Management - Oversee all interviewer-recruiter contracts, payments, and transaction security on the platform."
+          content="EZYJOBS Contract Management - Oversee all interviewer-recruiter contracts, payments, and transaction security on the platform."
         />
         <meta
           name="keywords"
-          content="OptaHire Contract Management, Admin Contracts, Payment Management, Interviewer Contracts"
+          content="EZYJOBS Contract Management, Admin Contracts, Payment Management, Interviewer Contracts"
         />
       </Helmet>
 

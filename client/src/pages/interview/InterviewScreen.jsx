@@ -310,14 +310,14 @@ const InterviewScreen = () => {
   return (
     <>
       <Helmet>
-        <title>Live Interview - OptaHire | Video Interview Platform</title>
+        <title>Live Interview - EZYJOBS | Video Interview Platform</title>
         <meta
           name="description"
-          content="Join your live video interview on OptaHire. Professional interview experience with real-time communication and feedback tools."
+          content="Join your live video interview on EZYJOBS. Professional interview experience with real-time communication and feedback tools."
         />
         <meta
           name="keywords"
-          content="OptaHire Live Interview, Video Interview, Online Interview, Interview Platform, Remote Interview"
+          content="EZYJOBS Live Interview, Video Interview, Online Interview, Interview Platform, Remote Interview"
         />
       </Helmet>
 

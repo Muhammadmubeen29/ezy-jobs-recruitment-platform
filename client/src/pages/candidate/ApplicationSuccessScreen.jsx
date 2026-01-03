@@ -35,14 +35,14 @@ export default function ApplicationSuccess() {
   return (
     <>
       <Helmet>
-        <title>Application Submitted - OptaHire | Success Confirmation</title>
+        <title>Application Submitted - EZYJOBS | Success Confirmation</title>
         <meta
           name="description"
-          content="Application successfully submitted to OptaHire. Track your application status and prepare for potential interview opportunities."
+          content="Application successfully submitted to EZYJOBS. Track your application status and prepare for potential interview opportunities."
         />
         <meta
           name="keywords"
-          content="OptaHire Application Success, Application Submitted, Job Application Confirmation, Application Status"
+          content="EZYJOBS Application Success, Application Submitted, Job Application Confirmation, Application Status"
         />
       </Helmet>
 

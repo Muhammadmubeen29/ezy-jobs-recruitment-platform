@@ -73,6 +73,16 @@ const createApplication = asyncHandler(async (req, res) => {
     );
   }
 
+  // FIXED: Prevent applications to closed jobs
+  // CRASH CAUSE: Closed jobs were still accepting applications
+  // SOLUTION: Check if job is closed before allowing application
+  if (job.isClosed === true) {
+    res.status(StatusCodes.BAD_REQUEST);
+    throw new Error(
+      'This job posting is closed and no longer accepting applications.'
+    );
+  }
+
   const existingApplication = await Application.findOne({
     jobId,
     candidateId,

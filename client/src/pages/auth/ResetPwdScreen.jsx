@@ -192,14 +192,14 @@ function ResetPwdScreen() {
   return (
     <>
       <Helmet>
-        <title>Reset Password - OptaHire | Secure Account Recovery</title>
+        <title>Reset Password - EZYJOBS | Secure Account Recovery</title>
         <meta
           name="description"
-          content="Reset your OptaHire password securely. Regain access to your recruitment account with our secure password recovery process."
+          content="Reset your EZYJOBS password securely. Regain access to your recruitment account with our secure password recovery process."
         />
         <meta
           name="keywords"
-          content="OptaHire Password Reset, Account Recovery, Secure Reset, Forgot Password, Account Access"
+          content="EZYJOBS Password Reset, Account Recovery, Secure Reset, Forgot Password, Account Access"
         />
       </Helmet>
       <section className="flex min-h-screen items-center justify-center bg-light-background px-4 py-14 dark:bg-dark-background">
@@ -240,7 +240,7 @@ function ResetPwdScreen() {
                 </h1>
                 <p className="mb-8 text-center text-lg text-light-text/70 dark:text-dark-text/70">
                   Securely reset your password and regain access to your
-                  OptaHire recruitment account.
+                  EZYJOBS recruitment account.
                 </p>
               </>
             )}

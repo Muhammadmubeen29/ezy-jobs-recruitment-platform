@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 
 import { aiApi } from './features/ai/aiApi';
 import { applicationApi } from './features/application/applicationApi';
+import { assessmentApi } from './features/assessment/assessmentApi';
 import { authApi } from './features/auth/authApi';
 import { chatApi } from './features/chat/chatApi';
 import { contractApi } from './features/contract/contractApi';
@@ -20,6 +21,7 @@ const store = configureStore({
   reducer: {
     [aiApi.reducerPath]: aiApi.reducer,
     [applicationApi.reducerPath]: applicationApi.reducer,
+    [assessmentApi.reducerPath]: assessmentApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [chatApi.reducerPath]: chatApi.reducer,
     [contractApi.reducerPath]: contractApi.reducer,
@@ -37,6 +39,7 @@ const store = configureStore({
     getDefaultMiddleware().concat(
       aiApi.middleware,
       applicationApi.middleware,
+      assessmentApi.middleware,
       authApi.middleware,
       chatApi.middleware,
       contractApi.middleware,
@@ -54,6 +57,7 @@ const store = configureStore({
         if (action.type === logoutUser.type) {
           store.dispatch(aiApi.util.resetApiState());
           store.dispatch(applicationApi.util.resetApiState());
+          store.dispatch(assessmentApi.util.resetApiState());
           store.dispatch(authApi.util.resetApiState());
           store.dispatch(chatApi.util.resetApiState());
           store.dispatch(contractApi.util.resetApiState());
