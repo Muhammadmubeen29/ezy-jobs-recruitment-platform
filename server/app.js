@@ -15,7 +15,6 @@ const { Server } = require('socket.io');
 const xss = require('xss-clean');
 
 const connectDB = require('./config/database');
-const db = require('./models');
 
 const {
   errorHandler,
@@ -47,92 +46,58 @@ dotenv.config();
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = process.env.PORT || 5000;
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
 
 const app = express();
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
+// Middleware
 app.set('trust proxy', 1);
-
 app.use(
   rateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 100,
     message: 'Too many requests from this IP, please try again later.',
-    handler: (req, res, next, options) => {
-      res.status(429).json({
-        success: false,
-        message: 'Too many requests from this IP, please try again later.',
-        timestamp: new Date().toISOString(),
-      });
-    },
     standardHeaders: true,
     legacyHeaders: true,
   })
 );
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
 app.use(helmet());
+app.use(xss());
+app.use(cookieParser());
 
-// CORS configuration - supports both development and production
-const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [
-  'http://localhost:5173',
-  'http://localhost:5000',
-];
-
-// Add CLIENT_URL to allowed origins if provided
+const corsOrigins =
+  process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [
+    'http://localhost:5173',
+    'http://localhost:5000',
+  ];
 if (process.env.CLIENT_URL && !corsOrigins.includes(process.env.CLIENT_URL)) {
   corsOrigins.push(process.env.CLIENT_URL);
 }
-
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.) in development
-    if (!origin && process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    // Check if origin is in allowed list
-    if (origin && corsOrigins.some(allowedOrigin => {
-      // Exact match
-      if (origin === allowedOrigin) return true;
-      // Support Vercel preview URLs (e.g., https://project-git-branch.vercel.app)
-      if (allowedOrigin.includes('vercel.app') && origin.includes('vercel.app')) {
-        return true;
-      }
-      return false;
-    })) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Not allowed by CORS. Origin: ${origin || 'none'}, Allowed: ${corsOrigins.join(', ')}`));
-    }
+    if (!origin && NODE_ENV === 'development') return callback(null, true);
+    if (origin && corsOrigins.some(allowed => origin.includes(allowed))) return callback(null, true);
+    callback(new Error(`Not allowed by CORS: ${origin || 'none'}`));
   },
   credentials: true,
-  optionsSuccessStatus: 200,
 };
-
 app.use(cors(corsOptions));
 
-app.use(xss());
-
-app.use(cookieParser());
-
-if (NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
-
-if (NODE_ENV === 'production') {
-  app.use(morgan('combined'));
-}
+if (NODE_ENV === 'development') app.use(morgan('dev'));
+if (NODE_ENV === 'production') app.use(morgan('combined'));
 
 app.use(rawBodyMiddleware);
 
+// Routes
 app.get('/', (req, res) => {
-  res
-    .status(StatusCodes.OK)
-    .sendFile(path.join(__dirname, 'public', 'index.html'));
+  // Safe for serverless Vercel: just return JSON
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.get('/api/v1/test', (req, res) => {
@@ -143,11 +108,13 @@ app.get('/api/v1/test', (req, res) => {
   });
 });
 
-if (NODE_ENV === 'development') {
+// Swagger only in local dev
+if (NODE_ENV === 'development' && !isVercel) {
   const swaggerDocs = swaggerJsdoc(swaggerOptions);
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 }
 
+// API routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/resumes', resumeRoutes);
@@ -163,83 +130,28 @@ app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/pre-assessments', preAssessmentRoutes);
 
+// Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Check if running in Vercel serverless environment
-const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-
-// Initialize server and Socket.io only if not in serverless mode
-let server, io;
-
+// Local server with Socket.io (not in Vercel)
 if (!isVercel) {
-  server = http.createServer(app);
-
-  io = new Server(server, {
+  const server = http.createServer(app);
+  const io = new Server(server, {
     cors: {
       origin: corsOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },
   });
-
   setupChatSocket(io);
   setupVideoCallSocket(io);
+
+  connectDB().then(() => {
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  });
 }
 
-const startServer = async () => {
-  try {
-    // Connect to MongoDB
-    await connectDB();
-    
-    // Only start listening if not in serverless mode
-    if (!isVercel && server) {
-      server.listen(PORT, () => {
-        console.log('\n' + '='.repeat(86).yellow);
-        console.log(`🚀 SERVER STATUS`.bold.yellow);
-        console.log('='.repeat(86).yellow);
-        console.log(
-          `✅ Status:     Server is running and listening for requests.`.green
-        );
-        console.log(`🔗 Port:       ${PORT}`.cyan);
-        console.log(`🌍 Node ENV:   ${NODE_ENV}`.yellow);
-        console.log(`⏰ Timestamp:  ${new Date().toLocaleString()}`.magenta);
-        console.log('-'.repeat(86).yellow);
-        console.log(`📍 Local URL:  ${SERVER_URL}`.cyan);
-        console.log(`📘 API Docs:   ${SERVER_URL}/api-docs`.magenta);
-        console.log('='.repeat(86).yellow);
-      });
-    } else if (isVercel) {
-      // In serverless mode, just log that app is ready
-      console.log('✅ Serverless function initialized');
-    }
-  } catch (error) {
-    console.error('\n' + '='.repeat(86).red);
-    console.error(`❌ SERVER STARTUP ERROR`.red.bold);
-    console.error('='.repeat(86).red);
-    console.error(`📌 Error Type: ${error.name || 'Unknown Error'}`.red);
-    console.error(
-      `💬 Message:    ${
-        error.message || 'Server failed to start due to an unexpected error.'
-      }`.red
-    );
-    console.error(`🕒 Time:       ${new Date().toLocaleString()}`.red);
-    console.error('='.repeat(86).red);
-    if (!isVercel) {
-      process.exit(1);
-    }
-    throw error;
-  }
-};
-
-// Only start server if not in serverless mode
-// In serverless mode, Vercel will handle the request/response cycle
-if (!isVercel) {
-  startServer();
-} else {
-  // In serverless mode, connect to DB on first request (cold start)
-  // This will be handled per-request in the serverless function
-}
-
-// Export app for serverless functions
 module.exports = app;
