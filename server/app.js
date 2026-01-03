@@ -7,7 +7,6 @@ const rateLimiter = require('express-rate-limit');
 const helmet = require('helmet');
 const http = require('http');
 const morgan = require('morgan');
-const path = require('path');
 const { StatusCodes } = require('http-status-codes');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
@@ -52,6 +51,7 @@ const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
 // Middleware
 app.set('trust proxy', 1);
+
 app.use(
   rateLimiter({
     windowMs: 15 * 60 * 1000,
@@ -61,12 +61,14 @@ app.use(
     legacyHeaders: true,
   })
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
 app.use(xss());
 app.use(cookieParser());
 
+// CORS setup (works on Vercel and local)
 const corsOrigins =
   process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [
     'http://localhost:5173',
@@ -75,14 +77,23 @@ const corsOrigins =
 if (process.env.CLIENT_URL && !corsOrigins.includes(process.env.CLIENT_URL)) {
   corsOrigins.push(process.env.CLIENT_URL);
 }
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin && NODE_ENV === 'development') return callback(null, true);
-    if (origin && corsOrigins.some(allowed => origin.includes(allowed))) return callback(null, true);
-    callback(new Error(`Not allowed by CORS: ${origin || 'none'}`));
+    // Allow requests with no origin (browser direct, Postman, serverless)
+    if (!origin) return callback(null, true);
+
+    // Allow only specified origins
+    if (corsOrigins.some(allowed => origin.includes(allowed))) {
+      return callback(null, true);
+    }
+
+    callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
+  optionsSuccessStatus: 200,
 };
+
 app.use(cors(corsOptions));
 
 if (NODE_ENV === 'development') app.use(morgan('dev'));
@@ -90,9 +101,8 @@ if (NODE_ENV === 'production') app.use(morgan('combined'));
 
 app.use(rawBodyMiddleware);
 
-// Routes
+// Root route (safe for serverless)
 app.get('/', (req, res) => {
-  // Safe for serverless Vercel: just return JSON
   res.status(StatusCodes.OK).json({
     success: true,
     message: 'API is running',
@@ -100,6 +110,7 @@ app.get('/', (req, res) => {
   });
 });
 
+// API health check
 app.get('/api/v1/test', (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
@@ -108,7 +119,7 @@ app.get('/api/v1/test', (req, res) => {
   });
 });
 
-// Swagger only in local dev
+// Swagger only in local development
 if (NODE_ENV === 'development' && !isVercel) {
   const swaggerDocs = swaggerJsdoc(swaggerOptions);
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
@@ -130,11 +141,11 @@ app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/pre-assessments', preAssessmentRoutes);
 
-// Error handling
+// Error handlers
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Local server with Socket.io (not in Vercel)
+// Local server with Socket.io (skipped in Vercel serverless)
 if (!isVercel) {
   const server = http.createServer(app);
   const io = new Server(server, {
@@ -149,7 +160,9 @@ if (!isVercel) {
 
   connectDB().then(() => {
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(
+        `✅ Server running in ${NODE_ENV} mode on port ${PORT}`.green.bold
+      );
     });
   });
 }
