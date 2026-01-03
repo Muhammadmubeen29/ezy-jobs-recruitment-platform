@@ -177,7 +177,7 @@ if (!isVercel) {
 
   io = new Server(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: corsOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },

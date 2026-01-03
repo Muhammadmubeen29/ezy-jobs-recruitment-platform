@@ -68,6 +68,7 @@ module.exports = async (req, res) => {
   });
   
   // Handle the request with Express app
-  return app(req, res);
+  // Express app handles the response internally, so we don't need to return anything
+  app(req, res);
 };
 
